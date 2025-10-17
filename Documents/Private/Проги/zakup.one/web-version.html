@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>zakup.one - Веб-версия</title>
+    <script src="demo-data.js"></script>
+    <link rel="stylesheet" href="web-styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="app-title">
+                    <h1>zakup.one</h1>
+                    <p>Профессиональные строительные материалы</p>
+                </div>
+                <div class="header-actions">
+                    <div class="search-container">
+                        <input type="text" placeholder="Поиск товаров..." class="search-input">
+                        <button class="search-btn">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="user-menu">
+                        <button class="version-switcher" id="version-switcher" title="Переключить на Telegram App">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Telegram App</span>
+                        </button>
+                        <button class="user-btn">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                            <span>Профиль</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Категории</h3>
+                    <ul class="category-list">
+                        <li class="category-item active">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Все товары</span>
+                        </li>
+                        <li class="category-item">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Арматура</span>
+                        </li>
+                        <li class="category-item">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Двутавры</span>
+                        </li>
+                        <li class="category-item">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Трубы</span>
+                        </li>
+                        <li class="category-item">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span>Кирпич</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Поставщики</h3>
+                    <div class="supplier-filters">
+                        <label class="filter-item">
+                            <input type="checkbox" checked>
+                            <span>СтройДвор</span>
+                        </label>
+                        <label class="filter-item">
+                            <input type="checkbox" checked>
+                            <span>МеталлСтрой</span>
+                        </label>
+                        <label class="filter-item">
+                            <input type="checkbox" checked>
+                            <span>СтройМатериалы</span>
+                        </label>
+                        <label class="filter-item">
+                            <input type="checkbox" checked>
+                            <span>БетонПлюс</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Цена</h3>
+                    <div class="price-range">
+                        <input type="range" min="0" max="10000" value="5000" class="price-slider">
+                        <div class="price-labels">
+                            <span>0 сом</span>
+                            <span>10,000 сом</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <h2>Каталог товаров</h2>
+                        <span class="product-count">Найдено 156 товаров</span>
+                    </div>
+                    <div class="toolbar-right">
+                        <select class="sort-select">
+                            <option>По цене</option>
+                            <option>По названию</option>
+                            <option>По поставщику</option>
+                        </select>
+                        <button class="view-toggle active" data-view="grid">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+                            </svg>
+                        </button>
+                        <button class="view-toggle" data-view="list">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Products Grid -->
+                <div class="products-grid" id="products-grid">
+                    <!-- Product cards will be generated here -->
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button class="page-btn prev" disabled>
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                        </svg>
+                        Назад
+                    </button>
+                    <div class="page-numbers">
+                        <button class="page-number active">1</button>
+                        <button class="page-number">2</button>
+                        <button class="page-number">3</button>
+                        <span class="page-ellipsis">...</span>
+                        <button class="page-number">8</button>
+                    </div>
+                    <button class="page-btn next">
+                        Вперед
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Cart Sidebar -->
+        <aside class="cart-sidebar" id="cart-sidebar">
+            <div class="cart-header">
+                <h3>Корзина</h3>
+                <button class="close-cart" id="close-cart">
+                    <svg class="icon-svg" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="cart-content">
+                <div class="cart-items" id="cart-items">
+                    <!-- Cart items will be generated here -->
+                </div>
+                <div class="cart-summary">
+                    <div class="cart-total">
+                        <span>Итого:</span>
+                        <span class="total-amount">0 сом</span>
+                    </div>
+                    <button class="checkout-btn">Оформить заказ</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Cart Toggle -->
+        <button class="cart-toggle" id="cart-toggle">
+            <svg class="icon-svg" viewBox="0 0 24 24">
+                <path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12L8.1 13h7.45c.75 0 1.41-.41 1.75-1.03L21.7 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+            <span class="cart-count">0</span>
+        </button>
+    </div>
+
+    <script src="web-script.js"></script>
+</body>
+</html>

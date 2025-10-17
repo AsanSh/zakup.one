@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>zakup.one - Строительные материалы</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="demo-data.js"></script>
+    <script src="api.js"></script>
+    <link rel="stylesheet" href="web-desktop-styles.css">
+    <link rel="stylesheet" href="device-choice.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="app-title">
+                    <h1>zakup.one</h1>
+                    <p>Профессиональные строительные материалы</p>
+                </div>
+                <div class="header-actions">
+                    <button class="version-switcher" id="version-switcher" title="Переключить на Telegram App">
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        </svg>
+                        <span>Telegram App</span>
+                    </button>
+                    <button class="user-btn">
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        <span>Профиль</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search Panel -->
+            <div class="search-panel">
+                <div class="search-input-container">
+                    <input
+                        type="text"
+                        placeholder="🔍 Поиск товара..."
+                        id="search-input"
+                        class="search-input"
+                    />
+                </div>
+            </div>
+
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Results Header -->
+                <div class="results-header">
+                    <div class="results-info">
+                        <h2>Каталог товаров</h2>
+                        <span id="results-count">Найдено 156 товаров</span>
+                    </div>
+                    <div class="results-controls">
+                        <select id="sort-select" class="sort-select">
+                            <option value="price-asc">По цене ↑</option>
+                            <option value="price-desc">По цене ↓</option>
+                            <option value="name-asc">По названию ↑</option>
+                            <option value="name-desc">По названию ↓</option>
+                            <option value="supplier">По поставщику</option>
+                        </select>
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="grid">
+                                <svg class="icon-svg" viewBox="0 0 24 24">
+                                    <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 13h8v8h-8v-8zm6 6h-4v-4h4v4z"/>
+                                </svg>
+                            </button>
+                            <button class="view-btn" data-view="list">
+                                <svg class="icon-svg" viewBox="0 0 24 24">
+                                    <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Grid/List -->
+                <div id="products-container" class="products-grid">
+                    <!-- Товары будут загружены динамически -->
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button class="page-btn" id="prev-page" disabled>
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                        </svg>
+                        Назад
+                    </button>
+                    <div class="page-numbers">
+                        <button class="page-number active">1</button>
+                        <button class="page-number">2</button>
+                        <button class="page-number">3</button>
+                        <span class="page-dots">...</span>
+                        <button class="page-number">8</button>
+                    </div>
+                    <button class="page-btn" id="next-page">
+                        Вперед
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Cart Sidebar -->
+        <div id="cart-sidebar" class="cart-sidebar">
+            <div class="cart-header">
+                <h3>Корзина</h3>
+                <button class="close-cart" id="close-cart">
+                    <svg class="icon-svg" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="cart-items" id="cart-items">
+                <!-- Товары корзины -->
+            </div>
+            <div class="cart-total">
+                <span>Итого: <span id="cart-total">0</span> сом</span>
+            </div>
+            <button class="checkout-btn" id="checkout-btn">
+                Оформить заказ
+            </button>
+        </div>
+
+        <!-- Cart Button -->
+        <button class="cart-button" id="cart-button">
+            <svg class="icon-svg" viewBox="0 0 24 24">
+                <path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12L8.1 13h7.45c.75 0 1.41-.41 1.75-1.03L21.7 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+            <span class="cart-count" id="cart-count">0</span>
+        </button>
+    </div>
+
+    <script>
+        // Simple LiveSearch functionality without JSX
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize search functionality
+            const searchInput = document.getElementById('search-input');
+            const categorySelect = document.getElementById('category-select');
+            const productsContainer = document.getElementById('products-container');
+            
+            let currentResults = [];
+            let cart = [];
+            
+                    // Search function
+                    function searchProducts(query) {
+                        const products = window.demoData?.products || [];
+                        let filtered = products;
+                        
+                        if (query && query.trim().length > 0) {
+                            filtered = filtered.filter(product => 
+                                product.name.toLowerCase().includes(query.toLowerCase()) ||
+                                product.category.toLowerCase().includes(query.toLowerCase()) ||
+                                product.supplier.toLowerCase().includes(query.toLowerCase())
+                            );
+                        }
+                        
+                        currentResults = filtered;
+                        displayResults(filtered);
+                    }
+            
+            // Display results
+            function displayResults(products) {
+                if (!productsContainer) return;
+                
+                if (products.length === 0) {
+                    productsContainer.innerHTML = '<div class="no-results"><p>Товары не найдены</p></div>';
+                    return;
+                }
+                
+                productsContainer.innerHTML = products.map(product => `
+                    <div class="product-card">
+                        <div class="product-info">
+                            <h4>${product.name}</h4>
+                            <p class="product-category">${product.category}</p>
+                            <p class="product-supplier">${product.supplier}</p>
+                        </div>
+                        <div class="product-price">
+                            <span class="price">${product.price} сом</span>
+                            <span class="unit">за ${product.unit}</span>
+                        </div>
+                        <button class="add-to-cart-btn" onclick="addToCart(${product.id})">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12L8.1 13h7.45c.75 0 1.41-.41 1.75-1.03L21.7 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                `).join('');
+            }
+            
+                    // Event listeners
+                    if (searchInput) {
+                        searchInput.addEventListener('input', function() {
+                            const query = this.value;
+                            searchProducts(query);
+                        });
+                    }
+                    
+                    // Initialize with all products
+                    searchProducts('');
+            
+            // Mobile sidebar toggle
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.querySelector('.sidebar');
+            
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('open');
+                    
+                    // Update button text
+                    if (sidebar.classList.contains('open')) {
+                        this.innerHTML = `
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                            Скрыть фильтры
+                        `;
+                    } else {
+                        this.innerHTML = `
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                            </svg>
+                            Фильтры и категории
+                        `;
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script src="script.js"></script>
+</body>
+</html>

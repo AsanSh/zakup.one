@@ -1,0 +1,234 @@
+/* Device Choice Modal Styles */
+.device-choice-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+.modal-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.modal-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.modal-header p {
+    font-size: 14px;
+    color: #666;
+}
+
+.modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.version-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.version-btn:hover {
+    border-color: #2a5298;
+    box-shadow: 0 4px 12px rgba(42, 82, 152, 0.1);
+    transform: translateY(-1px);
+}
+
+.version-btn:active {
+    transform: translateY(0);
+}
+
+.telegram-btn:hover {
+    border-color: #0088cc;
+    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.1);
+}
+
+.btn-icon {
+    width: 48px;
+    height: 48px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.telegram-btn .btn-icon {
+    background: linear-gradient(135deg, #0088cc 0%, #0066aa 100%);
+}
+
+.telegram-btn .btn-icon svg {
+    fill: white;
+}
+
+.web-btn .btn-icon {
+    background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+}
+
+.web-btn .btn-icon svg {
+    fill: white;
+}
+
+.btn-content {
+    flex: 1;
+}
+
+.btn-content h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.btn-content p {
+    font-size: 14px;
+    color: #666;
+}
+
+.modal-footer {
+    text-align: center;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
+}
+
+.remember-choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+}
+
+.remember-choice input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #2a5298;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .modal-content {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .version-btn {
+        padding: 12px;
+        gap: 12px;
+    }
+    
+    .btn-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .btn-content h4 {
+        font-size: 14px;
+    }
+    
+    .btn-content p {
+        font-size: 12px;
+    }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    .modal-content {
+        background: #2d2d2d;
+        color: white;
+    }
+    
+    .modal-header h3 {
+        color: white;
+    }
+    
+    .modal-header p {
+        color: #cccccc;
+    }
+    
+    .version-btn {
+        background: #3d3d3d;
+        border-color: #555;
+    }
+    
+    .version-btn:hover {
+        border-color: #4a9eff;
+    }
+    
+    .btn-content h4 {
+        color: white;
+    }
+    
+    .btn-content p {
+        color: #cccccc;
+    }
+    
+    .modal-footer {
+        border-top-color: #555;
+    }
+    
+    .remember-choice {
+        color: #cccccc;
+    }
+}

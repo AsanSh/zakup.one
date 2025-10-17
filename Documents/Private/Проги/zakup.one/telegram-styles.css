@@ -1,0 +1,482 @@
+/* Telegram App Specific Styles */
+
+/* Telegram WebApp Container */
+#app {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    background-color: var(--tg-theme-bg-color, #ffffff);
+    color: var(--tg-theme-text-color, #000000);
+}
+
+/* Header for Telegram */
+.header {
+    background: var(--tg-theme-secondary-bg-color, linear-gradient(135deg, #1e3c72 0%, #2a5298 100%));
+    color: var(--tg-theme-button-text-color, #ffffff);
+    padding: 16px;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.app-title h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+    color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.app-title p {
+    font-size: 14px;
+    margin: 0;
+    opacity: 0.9;
+    color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.version-switcher,
+.user-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--tg-theme-button-text-color, #ffffff);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.version-switcher:hover,
+.user-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.version-switcher .icon-svg,
+.user-btn .icon-svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+/* Main Content for Telegram */
+.main-content {
+    flex: 1;
+    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 80px; /* Space for bottom nav */
+}
+
+/* Search Panel for Telegram */
+.search-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.search-input-container,
+.category-select-container {
+    width: 100%;
+}
+
+.search-input,
+.category-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--tg-theme-hint-color, #e9ecef);
+    border-radius: 12px;
+    font-size: 16px;
+    background: var(--tg-theme-bg-color, #ffffff);
+    color: var(--tg-theme-text-color, #000000);
+    transition: all 0.3s ease;
+}
+
+.search-input:focus,
+.category-select:focus {
+    outline: none;
+    border-color: var(--tg-theme-button-color, #2a5298);
+    box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+}
+
+.search-input::placeholder {
+    color: var(--tg-theme-hint-color, #999999);
+}
+
+/* Results Header */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--tg-theme-hint-color, #eee);
+}
+
+.results-info h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.results-info span {
+    color: var(--tg-theme-hint-color, #666666);
+    font-size: 14px;
+}
+
+.results-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sort-select {
+    padding: 6px 10px;
+    border: 1px solid var(--tg-theme-hint-color, #ddd);
+    border-radius: 6px;
+    background: var(--tg-theme-bg-color, #ffffff);
+    color: var(--tg-theme-text-color, #000000);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* Products Grid for Telegram */
+.products-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.product-card {
+    background: var(--tg-theme-bg-color, #ffffff);
+    border: 1px solid var(--tg-theme-hint-color, #eee);
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.product-card:hover {
+    border-color: var(--tg-theme-button-color, #2a5298);
+    box-shadow: 0 4px 12px rgba(42, 82, 152, 0.1);
+    transform: translateY(-2px);
+}
+
+.product-info h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.product-category {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #666666);
+    margin-bottom: 4px;
+}
+
+.product-supplier {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #999999);
+    margin-bottom: 12px;
+}
+
+.product-price {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.price {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--tg-theme-button-color, #2a5298);
+}
+
+.unit {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #666666);
+}
+
+.add-to-cart-btn {
+    width: 100%;
+    padding: 10px 16px;
+    background: var(--tg-theme-button-color, #2a5298);
+    color: var(--tg-theme-button-text-color, #ffffff);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.add-to-cart-btn:hover {
+    background: var(--tg-theme-button-color, #1e3c72);
+    transform: translateY(-1px);
+}
+
+.add-to-cart-btn .icon-svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+/* Bottom Navigation for Telegram */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--tg-theme-secondary-bg-color, #ffffff);
+    border-top: 1px solid var(--tg-theme-hint-color, #eee);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0;
+    z-index: 1000;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    min-width: 60px;
+    position: relative;
+}
+
+.nav-item.active {
+    background: var(--tg-theme-button-color, #2a5298);
+    color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.nav-item:not(.active) {
+    color: var(--tg-theme-hint-color, #666666);
+}
+
+.nav-item:hover:not(.active) {
+    background: var(--tg-theme-hint-color, #f8f9fa);
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.nav-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-icon .icon-svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+.cart-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: var(--tg-theme-destructive-text-color, #ff4444);
+    color: var(--tg-theme-button-text-color, #ffffff);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.nav-item span {
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* Pages */
+.page {
+    display: none;
+    width: 100%;
+}
+
+.page.active {
+    display: block;
+}
+
+/* Welcome Section */
+.welcome-section {
+    text-align: center;
+    padding: 20px 0;
+    background: var(--tg-theme-bg-color, #ffffff);
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.welcome-section h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.welcome-section p {
+    font-size: 14px;
+    color: var(--tg-theme-hint-color, #666666);
+}
+
+/* Cart Items */
+.cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--tg-theme-bg-color, #ffffff);
+    border: 1px solid var(--tg-theme-hint-color, #eee);
+    border-radius: 8px;
+}
+
+.cart-item-info {
+    flex: 1;
+}
+
+.cart-item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--tg-theme-text-color, #000000);
+    margin-bottom: 4px;
+}
+
+.cart-item-details {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #666666);
+}
+
+.cart-item-price {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--tg-theme-button-color, #2a5298);
+}
+
+.cart-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-top: 1px solid var(--tg-theme-hint-color, #eee);
+    margin-top: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--tg-theme-text-color, #000000);
+}
+
+.checkout-btn {
+    width: 100%;
+    padding: 12px 24px;
+    background: var(--tg-theme-button-color, #2a5298);
+    color: var(--tg-theme-button-text-color, #ffffff);
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 16px;
+}
+
+.checkout-btn:hover {
+    background: var(--tg-theme-button-color, #1e3c72);
+    transform: translateY(-1px);
+}
+
+/* Responsive for Telegram */
+@media (max-width: 480px) {
+    .main-content {
+        padding: 12px;
+        padding-bottom: 80px;
+    }
+    
+    .header {
+        padding: 12px;
+    }
+    
+    .app-title h1 {
+        font-size: 18px;
+    }
+    
+    .app-title p {
+        font-size: 12px;
+    }
+    
+    .version-switcher,
+    .user-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+    
+    .products-grid {
+        gap: 10px;
+    }
+    
+    .product-card {
+        padding: 12px;
+    }
+    
+    .nav-item {
+        padding: 6px 8px;
+        min-width: 50px;
+    }
+    
+    .nav-item span {
+        font-size: 9px;
+    }
+    
+    .nav-icon .icon-svg {
+        width: 18px;
+        height: 18px;
+    }
+}
