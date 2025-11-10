@@ -23,7 +23,12 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5467", "http://localhost:8000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5467",
+        "http://localhost:8000",
+        "http://127.0.0.1:5467",
+        "http://127.0.0.1:8000",
+    ]
     
     # Email settings
     MAIL_USERNAME: str = ""

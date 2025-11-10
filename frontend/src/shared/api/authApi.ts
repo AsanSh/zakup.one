@@ -22,16 +22,35 @@ export interface RegisterData {
 
 export const authApi = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    const formData = new URLSearchParams()
-    formData.append('username', email)
-    formData.append('password', password)
+    try {
+      console.log('Sending login request to:', `${API_URL}/auth/login`)
+      
+      const formData = new URLSearchParams()
+      formData.append('username', email)
+      formData.append('password', password)
 
-    const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    })
-    return response.data
+      const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        withCredentials: true, // Для поддержки cookies если нужно
+      })
+      
+      console.log('Login response:', { 
+        status: response.status,
+        hasToken: !!response.data.access_token,
+        user: response.data.user 
+      })
+      
+      return response.data
+    } catch (error: any) {
+      console.error('Login error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
+      throw error
+    }
   },
 
   register: async (data: RegisterData): Promise<User> => {
