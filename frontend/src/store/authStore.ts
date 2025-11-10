@@ -24,6 +24,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
         const response: LoginResponse = await authApi.login(email, password)
         const { access_token, user } = response
         
+        console.log('Login response:', { access_token: access_token ? 'present' : 'missing', user }) // Debug
+        
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
         // Сохраняем в localStorage
@@ -39,6 +41,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
             is_admin: false,
           },
         }
+        console.log('Saving auth data:', { ...authData, token: 'present' }) // Debug
         localStorage.setItem('auth-storage', JSON.stringify({ state: authData }))
 
         set(authData)

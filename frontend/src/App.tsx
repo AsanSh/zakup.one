@@ -58,6 +58,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   // Если пользователь - администратор, перенаправляем в админ-панель
   if (user?.is_admin) {
+    console.log('ProtectedRoute: User is admin, redirecting to /admin') // Debug
     return <Navigate to="/admin" replace />
   }
   

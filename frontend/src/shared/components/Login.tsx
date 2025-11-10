@@ -20,10 +20,13 @@ export default function Login() {
       await login(email, password)
       // Проверяем, является ли пользователь администратором
       const { user } = useAuthStore.getState()
+      console.log('User after login:', user) // Debug
       if (user?.is_admin) {
-        navigate('/admin')
+        console.log('Redirecting to /admin') // Debug
+        navigate('/admin', { replace: true })
       } else {
-        navigate('/search')
+        console.log('Redirecting to /search') // Debug
+        navigate('/search', { replace: true })
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка входа. Проверьте данные.'
