@@ -54,8 +54,26 @@ export const authApi = {
   },
 
   register: async (data: RegisterData): Promise<User> => {
-    const response = await axios.post<User>(`${API_URL}/auth/register`, data)
-    return response.data
+    try {
+      console.log('Sending register request to:', `${API_URL}/auth/register`)
+      
+      const response = await axios.post<User>(`${API_URL}/auth/register`, data, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      console.log('Register response:', { status: response.status, user: response.data })
+      
+      return response.data
+    } catch (error: any) {
+      console.error('Register error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
+      throw error
+    }
   },
 
   getMe: async (): Promise<User> => {
