@@ -4,6 +4,7 @@ import { clientApi } from '../../shared/api'
 import type { Product } from '../../shared/types'
 import { useCartStore } from '../../store/cartStore'
 import { formatPrice, formatProductCount } from '../../shared/utils/formatters'
+import { useDebounce } from '../../shared/hooks/useDebounce'
 import { Plus, Loader2 } from 'lucide-react'
 
 export default function Search() {
@@ -41,13 +42,16 @@ export default function Search() {
     }
   }, [initialQuery])
 
-  // Загружаем товары при монтировании компонента и при изменении query
+  // Debounce поискового запроса для оптимизации
+  const debouncedQuery = useDebounce(query, 300)
+
+  // Загружаем товары при монтировании компонента и при изменении debouncedQuery
   useEffect(() => {
     const searchProducts = async () => {
       setLoading(true)
       try {
         // Если запрос пустой или меньше 2 символов, показываем все товары
-        const searchQuery = query.length >= 2 ? query : ""
+        const searchQuery = debouncedQuery.length >= 2 ? debouncedQuery : ""
         const results = await clientApi.searchProducts(searchQuery, 100)
         setProducts(results)
         // Показываем dropdown только если есть запрос >= 2 символов

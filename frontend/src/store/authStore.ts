@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import axios from 'axios'
+import apiClient from '../shared/api/axiosConfig'
 import { authApi, type RegisterData, type LoginResponse } from '../shared/api'
 import type { User } from '../shared/types'
 
@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null
   token: string | null
   isAuthenticated: boolean
+  isInitialized: boolean
   login: (email: string, password: string) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => void
@@ -17,12 +18,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
+      isInitialized: false,
 
       login: async (email: string, password: string) => {
         const response: LoginResponse = await authApi.login(email, password)
         const { access_token, user } = response
         
-        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
         // Сохраняем в localStorage
         const authData = {
@@ -48,7 +50,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       },
 
       logout: () => {
-        delete axios.defaults.headers.common['Authorization']
+        delete apiClient.defaults.headers.common['Authorization']
         set({
           user: null,
           token: null,
@@ -57,30 +59,40 @@ export const useAuthStore = create<AuthState>()((set) => ({
         localStorage.removeItem('auth-storage')
       },
       init: () => {
+        // Предотвращаем повторную инициализацию
+        const state = useAuthStore.getState()
+        if (state.isInitialized) {
+          return
+        }
+
         const stored = localStorage.getItem('auth-storage')
         if (stored) {
           try {
             const data = JSON.parse(stored)
             const token = data.state?.token
             if (token) {
-              // Устанавливаем токен в axios
-              axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+              // Устанавливаем токен в apiClient
+              apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
               console.log('Токен восстановлен из localStorage')
               set({
                 token: token,
                 user: data.state.user || null,
                 isAuthenticated: data.state.isAuthenticated || false,
+                isInitialized: true,
               })
             } else {
               console.warn('Токен не найден в localStorage')
+              set({ isInitialized: true })
             }
           } catch (e) {
             console.error('Error loading auth state:', e)
             // Очищаем поврежденные данные
             localStorage.removeItem('auth-storage')
+            set({ isInitialized: true })
           }
         } else {
           console.log('Нет сохраненных данных аутентификации')
+          set({ isInitialized: true })
         }
       },
     })
