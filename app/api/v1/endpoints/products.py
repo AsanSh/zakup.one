@@ -73,7 +73,7 @@ async def search_products(
             Product.name.ilike(f"%{q}%")
         ).limit(limit).all()
     
-    # Добавляем supplier_name к каждому товару
+    # Возвращаем товары с country (supplier_name скрыт от клиентов)
     result = []
     for p in products:
         product_dict = {
@@ -83,7 +83,8 @@ async def search_products(
             "unit": p.unit,
             "price": p.price,
             "category": p.category,
-            "supplier_name": p.supplier.name if p.supplier else None
+            "country": p.country  # Страна производства (видна клиентам)
+            # supplier_name НЕ возвращаем - это скрытая информация
         }
         result.append(product_dict)
     return result

@@ -55,7 +55,7 @@ export default function Search() {
         const results = await clientApi.searchProducts(searchQuery, 100)
         setProducts(results)
         // Показываем dropdown только если есть запрос >= 2 символов
-        if (query.length >= 2) {
+        if (debouncedQuery.length >= 2) {
           setShowDropdown(true)
         } else {
           setShowDropdown(false)
@@ -69,15 +69,8 @@ export default function Search() {
       }
     }
 
-    // Загружаем сразу при монтировании и для пустого запроса
-    if (query.length < 2) {
-      searchProducts()
-    } else {
-      // Для поиска с задержкой
-      const debounceTimer = setTimeout(searchProducts, 300)
-      return () => clearTimeout(debounceTimer)
-    }
-  }, [query])
+    searchProducts()
+  }, [debouncedQuery])
 
   const handleAddToCart = (product: Product) => {
     // Если товар уже в корзине, удаляем его
