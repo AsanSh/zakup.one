@@ -21,6 +21,7 @@ class Supplier(Base):
     
     # Связи
     products = relationship("Product", back_populates="supplier")
+    price_list_updates = relationship("PriceListUpdate", back_populates="supplier")
 
 
 class Product(Base):

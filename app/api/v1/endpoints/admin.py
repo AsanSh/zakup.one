@@ -9,10 +9,13 @@ from app.models.product import Product, Supplier
 from app.models.user import User
 from app.models.order import Order, OrderStatus
 from app.models.delivery import DeliveryTracking, DeliveryEvent, DeliveryStatus
+from app.models.price_list_update import PriceListUpdate, UpdateFrequency
 from app.services.price_import import PriceImportService
+from app.services.price_list_downloader import PriceListDownloader
 from app.api.v1.endpoints.auth import get_current_admin_user
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func, and_
 import os
 import shutil
 from pathlib import Path
@@ -147,6 +150,17 @@ async def verify_user(
     
     user.is_verified = True
     db.commit()
+    
+    # Отправляем email-уведомление об одобрении
+    try:
+        from app.services.email_service import send_verification_approved_notification
+        await send_verification_approved_notification(
+            email=user.email,
+            full_name=user.full_name
+        )
+    except Exception as e:
+        # Логируем ошибку, но не прерываем верификацию
+        print(f"⚠️  Ошибка отправки email при верификации: {e}")
     
     return {"success": True, "message": "Пользователь верифицирован"}
 
@@ -421,4 +435,345 @@ async def toggle_supplier_active(
     db.commit()
     
     return {"success": True, "is_active": supplier.is_active}
+
+
+@router.get("/stats")
+async def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить статистику для Dashboard"""
+    now = datetime.utcnow()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Статистика по заявкам по статусам
+    orders_by_status = {}
+    for status in OrderStatus:
+        count = db.query(Order).filter(Order.status == status).count()
+        orders_by_status[status.value] = count
+    
+    # Новые клиенты за текущий месяц
+    new_users_this_month = db.query(User).filter(
+        and_(
+            User.created_at >= start_of_month,
+            User.is_admin == False
+        )
+    ).count()
+    
+    # Общий оборот (сумма всех заявок)
+    # TODO: Добавить поле total_amount в Order или считать из OrderItem
+    total_turnover = 0  # Временное значение
+    
+    # Количество товаров в каталоге
+    total_products = db.query(Product).filter(Product.is_active == True).count()
+    
+    # График заявок по дням (последние 7 дней)
+    orders_by_day = []
+    for i in range(6, -1, -1):
+        day = now - timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        count = db.query(Order).filter(
+            and_(
+                Order.created_at >= day_start,
+                Order.created_at <= day_end
+            )
+        ).count()
+        
+        orders_by_day.append({
+            "date": day_start.isoformat(),
+            "count": count
+        })
+    
+    # Последние заявки
+    recent_orders = db.query(Order).order_by(Order.created_at.desc()).limit(5).all()
+    recent_orders_data = [
+        {
+            "id": order.id,
+            "user_name": order.user.full_name if order.user else None,
+            "status": order.status.value,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "items_count": len(order.items) if order.items else 0
+        }
+        for order in recent_orders
+    ]
+    
+    return {
+        "orders_by_status": orders_by_status,
+        "new_users_this_month": new_users_this_month,
+        "total_turnover": total_turnover,
+        "total_products": total_products,
+        "orders_by_day": orders_by_day,
+        "recent_orders": recent_orders_data
+    }
+
+
+@router.get("/users/pending")
+async def get_pending_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить список пользователей на модерации (не верифицированных)"""
+    pending_users = db.query(User).filter(
+        and_(
+            User.is_verified == False,
+            User.is_admin == False
+        )
+    ).order_by(User.created_at.desc()).all()
+    
+    return [
+        {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "company": user.company,
+            "is_verified": user.is_verified,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        }
+        for user in pending_users
+    ]
+
+
+class RejectUserRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.post("/users/{user_id}/reject")
+async def reject_user(
+    user_id: int,
+    reject_data: Optional[RejectUserRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Отклонить заявку на регистрацию (деактивировать пользователя)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    user.is_active = False
+    db.commit()
+    
+    # Отправляем email-уведомление об отклонении
+    reason = reject_data.reason if reject_data else None
+    try:
+        from app.services.email_service import send_verification_rejected_notification
+        await send_verification_rejected_notification(
+            email=user.email,
+            full_name=user.full_name,
+            reason=reason
+        )
+    except Exception as e:
+        # Логируем ошибку, но не прерываем отклонение
+        print(f"⚠️  Ошибка отправки email при отклонении: {e}")
+    
+    return {"success": True, "message": "Заявка отклонена"}
+
+
+@router.get("/orders/stats")
+async def get_orders_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить статистику по заявкам"""
+    now = datetime.utcnow()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Заявки по статусам
+    orders_by_status = {}
+    for status in OrderStatus:
+        count = db.query(Order).filter(Order.status == status).count()
+        orders_by_status[status.value] = count
+    
+    # Заявки за текущий месяц
+    orders_this_month = db.query(Order).filter(
+        Order.created_at >= start_of_month
+    ).count()
+    
+    return {
+        "orders_by_status": orders_by_status,
+        "orders_this_month": orders_this_month,
+        "total_orders": db.query(Order).count()
+    }
+
+
+@router.post("/price-lists/download-and-import")
+async def download_and_import_price_list(
+    supplier_id: int,
+    download_url: str,
+    frequency: str = "manual",
+    header_row: int = 7,
+    start_row: int = 8,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Скачать прайс-лист по URL и импортировать товары"""
+    try:
+        supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Поставщик не найден")
+        
+        # Скачиваем файл
+        downloader = PriceListDownloader(db)
+        file_path = downloader.download_price_list(download_url, supplier.name)
+        
+        if not file_path:
+            raise HTTPException(status_code=500, detail="Не удалось скачать файл")
+        
+        # Импортируем товары
+        # Используем специальный парсер для Стройдвор
+        if 'stroydvor' in download_url.lower():
+            from app.services.stroydvor_parser import StroydvorParser
+            parser = StroydvorParser(file_path)
+            products_data = parser.parse()
+            
+            # Импортируем через метод downloader
+            result = downloader._import_products_from_data(
+                products_data,
+                supplier_id,
+                header_row,
+                start_row
+            )
+        else:
+            # Используем стандартный импорт
+            import_service = PriceImportService(db)
+            result = import_service.import_from_file(
+                file_path,
+                supplier_id=supplier_id,
+                header_row=header_row,
+                start_row=start_row
+            )
+        
+        # Создаем или обновляем запись автоматического обновления
+        price_update = db.query(PriceListUpdate).filter(
+            PriceListUpdate.supplier_id == supplier_id,
+            PriceListUpdate.download_url == download_url
+        ).first()
+        
+        if not price_update:
+            price_update = PriceListUpdate(
+                supplier_id=supplier_id,
+                download_url=download_url,
+                frequency=UpdateFrequency(frequency),
+                header_row=header_row,
+                start_row=start_row,
+                is_active=True
+            )
+            db.add(price_update)
+        else:
+            price_update.frequency = UpdateFrequency(frequency)
+            price_update.header_row = header_row
+            price_update.start_row = start_row
+        
+        # Вычисляем следующее обновление
+        if frequency != "manual":
+            price_update.next_update = downloader._calculate_next_update(
+                UpdateFrequency(frequency)
+            )
+        
+        price_update.last_update = datetime.utcnow()
+        price_update.last_imported_count = result.get('imported', 0)
+        price_update.last_updated_count = result.get('updated', 0)
+        price_update.last_error = None
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "imported": result.get('imported', 0),
+            "updated": result.get('updated', 0),
+            "total_processed": result.get('total_processed', 0),
+            "update_id": price_update.id
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка импорта: {str(e)}")
+
+
+@router.get("/price-lists/updates", response_model=List[dict])
+async def get_price_list_updates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить список автоматических обновлений прайс-листов"""
+    updates = db.query(PriceListUpdate).all()
+    return [
+        {
+            "id": update.id,
+            "supplier_id": update.supplier_id,
+            "supplier_name": update.supplier.name if update.supplier else None,
+            "download_url": update.download_url,
+            "frequency": update.frequency.value,
+            "is_active": update.is_active,
+            "last_update": update.last_update.isoformat() if update.last_update else None,
+            "next_update": update.next_update.isoformat() if update.next_update else None,
+            "last_imported_count": update.last_imported_count,
+            "last_updated_count": update.last_updated_count,
+            "last_error": update.last_error
+        }
+        for update in updates
+    ]
+
+
+@router.put("/price-lists/updates/{update_id}")
+async def update_price_list_update(
+    update_id: int,
+    update_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Обновить настройки автоматического обновления прайс-листа"""
+    price_update = db.query(PriceListUpdate).filter(PriceListUpdate.id == update_id).first()
+    if not price_update:
+        raise HTTPException(status_code=404, detail="Запись обновления не найдена")
+    
+    if "frequency" in update_data:
+        price_update.frequency = UpdateFrequency(update_data["frequency"])
+    
+    if "is_active" in update_data:
+        price_update.is_active = update_data["is_active"]
+    
+    if "header_row" in update_data:
+        price_update.header_row = update_data["header_row"]
+    
+    if "start_row" in update_data:
+        price_update.start_row = update_data["start_row"]
+    
+    # Пересчитываем следующее обновление
+    if price_update.frequency != UpdateFrequency.MANUAL and price_update.is_active:
+        downloader = PriceListDownloader(db)
+        price_update.next_update = downloader._calculate_next_update(price_update.frequency)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "update": {
+            "id": price_update.id,
+            "frequency": price_update.frequency.value,
+            "is_active": price_update.is_active,
+            "next_update": price_update.next_update.isoformat() if price_update.next_update else None
+        }
+    }
+
+
+@router.post("/price-lists/updates/{update_id}/run")
+async def run_price_list_update(
+    update_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Запустить обновление прайс-листа вручную"""
+    downloader = PriceListDownloader(db)
+    result = downloader.update_price_list(update_id)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Ошибка обновления"))
+    
+    return result
 

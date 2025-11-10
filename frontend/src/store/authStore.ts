@@ -1,16 +1,7 @@
 import { create } from 'zustand'
 import axios from 'axios'
-
-const API_URL = '/api/v1'
-
-interface User {
-  id: number
-  email: string
-  full_name: string
-  company: string
-  is_verified: boolean
-  is_admin?: boolean
-}
+import { authApi, type RegisterData, type LoginResponse } from '../shared/api'
+import type { User } from '../shared/types'
 
 interface AuthState {
   user: User | null
@@ -22,31 +13,15 @@ interface AuthState {
   init: () => void
 }
 
-interface RegisterData {
-  email: string
-  full_name: string
-  phone: string
-  company: string
-  password: string
-}
-
 export const useAuthStore = create<AuthState>()((set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
 
       login: async (email: string, password: string) => {
-        const formData = new URLSearchParams()
-        formData.append('username', email)
-        formData.append('password', password)
-
-        const response = await axios.post(`${API_URL}/auth/login`, formData, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        })
-
-        const { access_token, user } = response.data
+        const response: LoginResponse = await authApi.login(email, password)
+        const { access_token, user } = response
+        
         axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
         // Сохраняем в localStorage
@@ -68,9 +43,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
       },
 
       register: async (data: RegisterData) => {
-        const response = await axios.post(`${API_URL}/auth/register`, data)
+        await authApi.register(data)
         // После регистрации НЕ входим автоматически - пользователь должен быть верифицирован
-        return response.data
       },
 
       logout: () => {

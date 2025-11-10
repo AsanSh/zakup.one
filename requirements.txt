@@ -19,6 +19,13 @@ openpyxl>=3.1.0
 # File upload
 aiofiles>=23.2.1
 
+# Email
+fastapi-mail>=1.4.1
+aiosmtplib>=3.0.0
+
+# HTTP requests
+requests>=2.31.0
+
 # Search engine (optional for MVP, but prepare for Elasticsearch)
 # elasticsearch>=8.11.0
 

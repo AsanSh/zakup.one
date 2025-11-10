@@ -1,12 +1,5 @@
 import { create } from 'zustand'
-
-export interface CartItem {
-  product_id: number
-  name: string
-  unit: string
-  price: number
-  quantity: number
-}
+import type { CartItem } from '../shared/types'
 
 interface CartState {
   items: CartItem[]

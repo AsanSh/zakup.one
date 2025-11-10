@@ -160,6 +160,18 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
+    # Отправляем email-уведомление о регистрации
+    try:
+        from app.services.email_service import send_registration_notification
+        await send_registration_notification(
+            email=user_data.email,
+            full_name=user_data.full_name,
+            company=user_data.company
+        )
+    except Exception as e:
+        # Логируем ошибку, но не прерываем регистрацию
+        print(f"⚠️  Ошибка отправки email при регистрации: {e}")
+    
     return new_user
 
 
