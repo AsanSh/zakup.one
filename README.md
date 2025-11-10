@@ -1,181 +1,246 @@
-# ZAKUP.ONE - Веб-платформа для снабженцев строительных компаний
+# ZAKUP.ONE - Платформа для закупок
 
-Веб-платформа-агрегатор для снабженцев строительных компаний с единым доступом к оптовым товарам от множества поставщиков.
+Веб-платформа для управления закупками, прайс-листами и заявками.
 
-## Технологический стек
+## 🚀 Технологии
 
 ### Backend
-- **Framework**: FastAPI (Python)
-- **База данных**: PostgreSQL
-- **Миграции**: Alembic
-- **Парсинг Excel**: pandas + openpyxl
+- **FastAPI** - современный веб-фреймворк для Python
+- **PostgreSQL** - реляционная база данных
+- **SQLAlchemy** - ORM для работы с БД
+- **Alembic** - миграции базы данных
+- **JWT** - аутентификация
 
 ### Frontend
-- **Framework**: React 18 + TypeScript
-- **Сборщик**: Vite
-- **Стили**: Tailwind CSS
-- **Роутинг**: React Router
-- **State Management**: Zustand
-- **HTTP клиент**: Axios
+- **React 18** - библиотека для создания UI
+- **TypeScript** - типизированный JavaScript
+- **Vite** - сборщик и dev-сервер
+- **Tailwind CSS** - утилитарный CSS фреймворк
+- **Zustand** - управление состоянием
+- **React Router** - маршрутизация
 
-## Структура проекта
+## 📋 Требования
+
+- Python 3.9+
+- Node.js 18+
+- PostgreSQL 12+
+- npm или yarn
+
+## 🛠️ Установка
+
+### 1. Клонирование репозитория
+
+```bash
+git clone https://github.com/AsanSh/zakup.one.git
+cd zakup.one
+```
+
+### 2. Настройка Backend
+
+```bash
+# Создайте виртуальное окружение
+python3 -m venv venv
+source venv/bin/activate  # На Windows: venv\Scripts\activate
+
+# Установите зависимости
+pip install -r requirements.txt
+
+# Настройте переменные окружения
+cp .env.example .env
+# Отредактируйте .env файл с вашими настройками БД
+```
+
+### 3. Настройка базы данных
+
+```bash
+# Создайте базу данных PostgreSQL
+createdb zakup_db
+
+# Выполните миграции
+alembic upgrade head
+
+# Или используйте SQL скрипт для быстрой настройки
+psql zakup_db -f setup_database.sql
+```
+
+### 4. Создание администратора
+
+```bash
+# Выполните SQL скрипт для создания админа
+psql zakup_db -f create_admin_sql.sql
+
+# Или используйте Python скрипт
+python3 create_tables_and_admin.py
+```
+
+**Данные для входа администратора:**
+- Email: `admin@zakup.one`
+- Пароль: `admin123`
+
+### 5. Создание демо-данных (опционально)
+
+```bash
+# Создайте демо-поставщика и товары
+psql zakup_db -f create_demo_data.sql
+```
+
+### 6. Настройка Frontend
+
+```bash
+cd frontend
+
+# Установите зависимости
+npm install
+
+# Или используйте yarn
+yarn install
+```
+
+## 🚀 Запуск
+
+### Backend
+
+```bash
+# Из корневой директории проекта
+uvicorn app.main:app --reload --port 8000
+
+# Или используйте скрипт
+./start-backend.sh
+```
+
+Backend будет доступен по адресу: `http://localhost:8000`
+
+### Frontend
+
+```bash
+cd frontend
+npm run dev
+
+# Или используйте скрипт
+./start-frontend.sh
+```
+
+Frontend будет доступен по адресу: `http://localhost:5467`
+
+## 📚 Структура проекта
 
 ```
-webscrp/
-├── app/                  # Backend (FastAPI)
-│   ├── api/              # API эндпоинты
-│   │   └── v1/
-│   │       └── endpoints/
-│   ├── core/             # Конфигурация и настройки
-│   ├── models/           # Модели базы данных
-│   └── services/         # Бизнес-логика
-├── frontend/             # Frontend (React)
+zakup.one/
+├── app/                    # Backend приложение
+│   ├── api/               # API endpoints
+│   ├── core/              # Конфигурация и БД
+│   ├── models/            # Модели данных
+│   └── services/          # Бизнес-логика
+├── frontend/              # Frontend приложение
 │   ├── src/
 │   │   ├── api/          # API клиент
 │   │   ├── components/   # React компоненты
 │   │   ├── pages/        # Страницы
-│   │   └── store/        # Zustand stores
+│   │   ├── store/        # Zustand stores
+│   │   └── App.tsx       # Главный компонент
 │   └── package.json
 ├── alembic/              # Миграции БД
-├── uploads/               # Загруженные файлы
-├── price_list_parser.py   # Парсер прайс-листов
-└── run.py                 # Точка входа backend
-
+├── requirements.txt      # Python зависимости
+└── README.md
 ```
 
-## Установка и запуск
+## 🔐 Аутентификация
 
-### 1. Установка зависимостей
+### Регистрация пользователя
+1. Перейдите на `/register`
+2. Заполните форму регистрации
+3. Дождитесь верификации администратором
 
-```bash
-pip install -r requirements.txt
-```
+### Вход в систему
+- **Клиент:** `/login`
+- **Админ:** `/login` (используйте данные администратора)
 
-### 2. Настройка базы данных
+## 👨‍💼 Админ-панель
 
-Создайте файл `.env` на основе `.env.example`:
+После входа как администратор, доступны следующие разделы:
 
-```bash
-cp .env.example .env
-```
+- **Пользователи** - управление пользователями и верификация
+- **Заявки** - просмотр и управление заявками от клиентов
+- **Товары** - управление товарами, ценами, категориями
+- **Прайс-листы** - загрузка и управление прайс-листами
+  - **Управление** - подразделы:
+    - Обновление прайс-листов (расписание)
+    - Управление ценами (массовое изменение)
+    - Управление контрагентами (доступ и права)
+    - Управление поставщиками
 
-Отредактируйте `.env` и укажите параметры подключения к PostgreSQL.
-
-### 3. Создание базы данных
-
-```bash
-# Создайте базу данных в PostgreSQL
-createdb zakup_db
-
-# Примените миграции
-alembic upgrade head
-```
-
-### 4. Запуск Backend
-
-```bash
-python run.py
-```
-
-Backend будет доступен по адресу: http://localhost:8000
-API документация: http://localhost:8000/api/docs
-
-### 5. Запуск Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend будет доступен по адресу: http://localhost:5467
-
-**Примечание**: Frontend настроен на прокси к backend через Vite, поэтому API запросы автоматически перенаправляются на `http://localhost:8000`
-
-## Основные возможности
-
-### MVP (Этап 1)
-
-**Backend:**
-- ✅ Парсинг прайс-листов из Excel
-- ✅ API для загрузки прайс-листов
-- ✅ Управление товарами и поставщиками
-- ✅ Управление пользователями (снабженцами)
-- ✅ Управление заявками
-- ✅ Поиск товаров
-- ✅ Создание заявок
-
-**Frontend:**
-- ✅ Авторизация и регистрация
-- ✅ Поиск товаров с автодополнением
-- ✅ Корзина товаров
-- ✅ Оформление заявок
-- ✅ История заявок
-- ✅ Адаптивный дизайн
-
-### Планируется
-
-- Умный поиск с автодополнением (Elasticsearch)
-- Массовое управление ценами
-- Текстовый ввод заявок (NLP)
-- Загрузка Excel/фото (OCR)
-- Автоматизированный парсинг прайс-листов
-
-## API эндпоинты
+## 📝 API Endpoints
 
 ### Аутентификация
-- `POST /api/v1/auth/register` - Регистрация
-- `POST /api/v1/auth/login` - Вход
+- `POST /api/v1/auth/register` - регистрация
+- `POST /api/v1/auth/login` - вход
+- `GET /api/v1/auth/me` - текущий пользователь
 
 ### Товары
-- `GET /api/v1/products/search?q=...` - Поиск товаров
-- `GET /api/v1/products/{id}` - Получить товар
+- `GET /api/v1/products/search?q=` - поиск товаров
+- `GET /api/v1/products/{id}` - получить товар
 
 ### Заявки
-- `GET /api/v1/orders` - Список заявок
-- `POST /api/v1/orders` - Создать заявку
+- `GET /api/v1/orders` - список заявок пользователя
+- `POST /api/v1/orders` - создать заявку
+- `GET /api/v1/orders/{id}/tracking` - отслеживание доставки
 
-### Админ-панель
-- `GET /api/v1/admin/suppliers` - Список поставщиков
-- `POST /api/v1/admin/suppliers` - Создать поставщика
-- `POST /api/v1/admin/import-price-list` - Загрузить прайс-лист
-- `GET /api/v1/admin/users` - Список пользователей
-- `POST /api/v1/admin/users/{id}/verify` - Верифицировать пользователя
-- `GET /api/v1/admin/orders` - Все заявки
-- `POST /api/v1/admin/orders/{id}/status` - Изменить статус заявки
+### Админ API
+- `GET /api/v1/admin/users` - список пользователей
+- `POST /api/v1/admin/users/{id}/verify` - верификация
+- `GET /api/v1/admin/orders` - все заявки
+- `GET /api/v1/admin/products` - все товары
+- `POST /api/v1/admin/import-price-list` - импорт прайс-листа
+- `POST /api/v1/admin/products/bulk-update-prices` - массовое изменение цен
 
-## Использование парсера прайс-листов
+## 🗄️ База данных
 
-Парсер интегрирован в систему через `PriceImportService`:
+### Основные таблицы
+- `users` - пользователи системы
+- `suppliers` - поставщики
+- `products` - товары
+- `orders` - заявки
+- `order_items` - позиции в заявках
+- `delivery_tracking` - отслеживание доставки
+- `delivery_events` - события доставки
 
-```python
-from app.services.price_import import PriceImportService
+## 🔧 Разработка
 
-service = PriceImportService(db)
-result = service.import_from_file(
-    file_path="path/to/file.xlsx",
-    supplier_id=1,
-    header_row=7,
-    start_row=8
-)
-```
-
-## Разработка
-
-### Создание миграций
+### Миграции БД
 
 ```bash
-alembic revision --autogenerate -m "Описание изменений"
+# Создать новую миграцию
+alembic revision --autogenerate -m "описание изменений"
+
+# Применить миграции
 alembic upgrade head
+
+# Откатить миграцию
+alembic downgrade -1
 ```
 
-### Запуск тестов
+### Переменные окружения
 
-```bash
-# TODO: Добавить тесты
+Создайте файл `.env` в корне проекта:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/zakup_db
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+API_V1_PREFIX=/api/v1
 ```
 
-## Лицензия
+## 📄 Лицензия
 
 MIT
 
+## 👥 Автор
+
+AsanSh
+
+## 🔗 Ссылки
+
+- GitHub: https://github.com/AsanSh/zakup.one
+- Backend API: http://localhost:8000/docs (Swagger UI)
+- Frontend: http://localhost:5467
