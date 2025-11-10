@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
             set({ isInitialized: true })
           }
         } else {
-          console.log('Нет сохраненных данных аутентификации')
+          // Нет сохраненных данных - это нормально для первого входа
           set({ isInitialized: true })
         }
       },

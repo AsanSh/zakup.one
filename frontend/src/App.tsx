@@ -92,7 +92,12 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <Routes>
         {/* Публичные роуты */}
         <Route path="/login" element={<Login />} />
