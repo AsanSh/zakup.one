@@ -2,18 +2,13 @@
 Сервис для импорта прайс-листов
 Интегрирует существующий парсер в систему
 """
-import sys
-from pathlib import Path
 from typing import List, Dict, Optional
 import pandas as pd
 from sqlalchemy.orm import Session
-
-# Добавляем родительскую директорию в путь для импорта парсера
-sys.path.append(str(Path(__file__).parent.parent.parent))
-from price_list_parser import PriceListParser
+from datetime import datetime
 
 from app.models.product import Product, Supplier
-from app.core.database import SessionLocal
+from app.services.stroydvor_parser import StroydvorParser
 
 
 class PriceImportService:
@@ -44,14 +39,6 @@ class PriceImportService:
             Словарь с результатами импорта
         """
         try:
-            # Используем существующий парсер
-            parser = PriceListParser(
-                file_path,
-                header_row=header_row,
-                start_row=start_row
-            )
-            products_data = parser.parse()
-            
             # Проверяем существование поставщика
             supplier = self.db.query(Supplier).filter(Supplier.id == supplier_id).first()
             if not supplier:
@@ -60,6 +47,17 @@ class PriceImportService:
                     "error": f"Поставщик с ID {supplier_id} не найден"
                 }
             
+            # Определяем, какой парсер использовать
+            # Если поставщик - Стройдвор, используем специальный парсер
+            if 'стройдвор' in supplier.name.lower():
+                parser = StroydvorParser(file_path)
+                products_data = parser.parse()
+            else:
+                # Для других поставщиков используем базовый парсер (если будет создан)
+                # Пока используем StroydvorParser как универсальный
+                parser = StroydvorParser(file_path)
+                products_data = parser.parse()
+            
             # Импортируем товары
             imported_count = 0
             updated_count = 0
@@ -67,13 +65,19 @@ class PriceImportService:
             
             for product_data in products_data:
                 try:
+                    name = product_data.get('name', '').strip()
+                    if not name:
+                        continue
+                    
                     # Проверяем, существует ли товар с таким названием у этого поставщика
                     existing_product = self.db.query(Product).filter(
-                        Product.name == product_data['название'],
+                        Product.name == name,
                         Product.supplier_id == supplier_id
                     ).first()
                     
-                    purchase_price = float(product_data.get('цена', 0.0) or 0.0)
+                    purchase_price = float(product_data.get('price', 0.0) or 0.0)
+                    unit = product_data.get('unit', 'шт')
+                    category = product_data.get('category', 'Разное')
                     
                     if existing_product:
                         # Обновляем существующий товар
@@ -82,17 +86,19 @@ class PriceImportService:
                         existing_product.purchase_price = purchase_price
                         existing_product.markup = markup
                         existing_product.price = purchase_price + markup  # Продажная цена
-                        existing_product.unit = product_data.get('единица_измерения') or existing_product.unit
-                        existing_product.updated_at = pd.Timestamp.now()
+                        existing_product.unit = unit
+                        existing_product.category = category
+                        existing_product.updated_at = datetime.utcnow()
                         updated_count += 1
                     else:
                         # Создаем новый товар
                         new_product = Product(
-                            name=product_data['название'],
-                            unit=product_data.get('единица_измерения', ''),
+                            name=name,
+                            unit=unit,
                             purchase_price=purchase_price,  # Закупочная цена из прайс-листа
                             markup=0.0,  # Надбавка по умолчанию 0
                             price=purchase_price,  # Продажная цена = закупочная (без надбавки)
+                            category=category,
                             supplier_id=supplier_id,
                             is_active=True
                         )
@@ -101,7 +107,7 @@ class PriceImportService:
                     
                 except Exception as e:
                     errors.append({
-                        "product": product_data.get('название', 'Unknown'),
+                        "product": product_data.get('name', 'Unknown'),
                         "error": str(e)
                     })
             
