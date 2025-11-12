@@ -3,7 +3,7 @@
 """
 import requests
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 import logging
 from sqlalchemy.orm import Session
@@ -186,7 +186,7 @@ class PriceListDownloader:
                 if not name:
                     continue
                 
-                price = float(product_data.get('price', 0))
+                purchase_price = float(product_data.get('price', 0))  # Цена из прайс-листа
                 unit = product_data.get('unit', 'шт')
                 category = product_data.get('category', 'Разное')
                 
@@ -198,7 +198,11 @@ class PriceListDownloader:
                 
                 if existing_product:
                     # Обновляем существующий товар
-                    existing_product.price = price
+                    # Сохраняем надбавку, если она была установлена
+                    markup = existing_product.markup or 0.0
+                    existing_product.purchase_price = purchase_price
+                    existing_product.markup = markup
+                    existing_product.price = purchase_price + markup  # Продажная цена
                     existing_product.unit = unit
                     existing_product.category = category
                     existing_product.updated_at = datetime.utcnow()
@@ -208,7 +212,9 @@ class PriceListDownloader:
                     new_product = Product(
                         name=name,
                         unit=unit,
-                        price=price,
+                        purchase_price=purchase_price,  # Закупочная цена из прайс-листа
+                        markup=0.0,  # Надбавка по умолчанию 0
+                        price=purchase_price,  # Продажная цена = закупочная (без надбавки)
                         category=category,
                         supplier_id=supplier_id,
                         is_active=True
@@ -221,8 +227,21 @@ class PriceListDownloader:
                     "product": product_data.get('name', 'Unknown'),
                     "error": str(e)
                 })
+                logger.error(f"Ошибка импорта товара {product_data.get('name', 'Unknown')}: {e}")
         
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Ошибка коммита транзакции: {e}")
+            return {
+                "success": False,
+                "error": f"Ошибка сохранения данных: {str(e)}",
+                "imported": imported_count,
+                "updated": updated_count,
+                "total_processed": len(products_data),
+                "errors": errors
+            }
         
         return {
             "success": True,

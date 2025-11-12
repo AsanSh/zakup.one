@@ -77,3 +77,9 @@ create_*.py
 update_*.py
 fix_*.sql
 *.sql.bak
+
+# Process files
+*.pid
+
+# Excel files (except example)
+!прайс-лист-01.10.25.xlsx

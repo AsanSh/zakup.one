@@ -58,31 +58,28 @@ createdb zakup_db
 
 # Выполните миграции
 alembic upgrade head
-
-# Или используйте SQL скрипт для быстрой настройки
-psql zakup_db -f setup_database.sql
 ```
 
 ### 4. Создание администратора
 
-```bash
-# Выполните SQL скрипт для создания админа
-psql zakup_db -f create_admin_sql.sql
+После выполнения миграций создайте администратора через SQL:
 
-# Или используйте Python скрипт
-python3 create_tables_and_admin.py
+```sql
+INSERT INTO users (email, full_name, company, hashed_password, is_admin, is_verified, is_active)
+VALUES (
+  'admin@zakup.one',
+  'Администратор',
+  'ZAKUP.ONE',
+  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5',  -- пароль: admin123
+  true,
+  true,
+  true
+);
 ```
 
 **Данные для входа администратора:**
 - Email: `admin@zakup.one`
 - Пароль: `admin123`
-
-### 5. Создание демо-данных (опционально)
-
-```bash
-# Создайте демо-поставщика и товары
-psql zakup_db -f create_demo_data.sql
-```
 
 ### 6. Настройка Frontend
 
@@ -102,10 +99,11 @@ yarn install
 
 ```bash
 # Из корневой директории проекта
+source venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 
 # Или используйте скрипт
-./start-backend.sh
+./start_backend.sh
 ```
 
 Backend будет доступен по адресу: `http://localhost:8000`
@@ -117,7 +115,7 @@ cd frontend
 npm run dev
 
 # Или используйте скрипт
-./start-frontend.sh
+./start_frontend.sh
 ```
 
 Frontend будет доступен по адресу: `http://localhost:5467`

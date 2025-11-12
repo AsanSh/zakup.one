@@ -9,7 +9,9 @@ export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingMarkupId, setEditingMarkupId] = useState<number | null>(null)  // ID товара, у которого редактируется надбавка
   const [editForm, setEditForm] = useState<Partial<Product>>({})
+  const [markupValue, setMarkupValue] = useState<string>('')  // Значение надбавки при редактировании
   const { token, init } = useAuthStore()
 
   // Убеждаемся, что токен инициализирован
@@ -42,7 +44,8 @@ export default function AdminProducts() {
     try {
       setLoading(true)
       console.log('Начинаем загрузку товаров...')
-      const data = await adminApi.getProducts(0, 200)
+      // Загружаем все товары (лимит 10000)
+      const data = await adminApi.getProducts(0, 10000)
       console.log('Загружено товаров:', data.length)
       if (data.length > 0) {
         console.log('Первые товары:', data.slice(0, 3).map(p => p.name))
@@ -76,6 +79,23 @@ export default function AdminProducts() {
       category: product.category,
       country: product.country,
     })
+  }
+
+  const handleEditMarkup = (product: Product) => {
+    setEditingMarkupId(product.id)
+    setMarkupValue((product.markup || 0).toString())
+  }
+
+  const handleSaveMarkup = async (productId: number) => {
+    try {
+      const markup = parseFloat(markupValue) || 0
+      await adminApi.updateProduct(productId, { markup })
+      setEditingMarkupId(null)
+      setMarkupValue('')
+      fetchProducts()
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Ошибка обновления надбавки')
+    }
   }
 
   const handleSave = async (productId: number) => {
@@ -112,7 +132,12 @@ export default function AdminProducts() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Товары</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Товары</h1>
+        <p className="text-sm text-gray-600 mt-2">
+          Всего товаров: <span className="font-semibold text-gray-900">{products.length}</span>
+        </p>
+      </div>
 
       {/* Компактное отображение как у клиентов, но с колонкой Поставщик */}
       <div className="space-y-8">
@@ -123,6 +148,18 @@ export default function AdminProducts() {
               <h3 className="text-lg font-semibold text-gray-900">
                 {category} ({groupedProducts[category].length} {formatProductCount(groupedProducts[category].length)})
               </h3>
+            </div>
+            
+            {/* Заголовки колонок */}
+            <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center gap-3 text-xs font-semibold text-gray-700">
+              <div className="flex-1 min-w-0">Название</div>
+              <div className="whitespace-nowrap" style={{ minWidth: '60px' }}>Кол-во</div>
+              <div className="whitespace-nowrap truncate" style={{ minWidth: '100px', maxWidth: '150px' }}>Производитель</div>
+              <div className="whitespace-nowrap truncate" style={{ minWidth: '120px', maxWidth: '180px' }}>Поставщик</div>
+              <div className="whitespace-nowrap text-right" style={{ minWidth: '100px' }}>Закуп.цена</div>
+              <div className="whitespace-nowrap text-right" style={{ minWidth: '100px' }}>Надбавка</div>
+              <div className="whitespace-nowrap text-right" style={{ minWidth: '100px' }}>Прод.цена</div>
+              <div className="flex justify-end" style={{ minWidth: '36px' }}></div>
             </div>
             
             {/* Список товаров - компактный формат */}
@@ -138,23 +175,77 @@ export default function AdminProducts() {
                     <span className="text-gray-900">{product.name}</span>
                   </div>
                   
-                  {/* Единица измерения */}
-                  <div className="text-gray-600 whitespace-nowrap" style={{ minWidth: '50px' }}>
+                  {/* Единица измерения (Кол-во) */}
+                  <div className="text-gray-600 whitespace-nowrap" style={{ minWidth: '60px' }}>
                     {product.unit || 'шт'}
                   </div>
                   
-                  {/* Страна производства */}
+                  {/* Страна производства (Производитель) */}
                   <div className="text-gray-500 whitespace-nowrap truncate" style={{ minWidth: '100px', maxWidth: '150px' }}>
                     {product.country || '-'}
                   </div>
                   
-                  {/* Поставщик (только для админа) */}
+                  {/* Поставщик */}
                   <div className="text-gray-600 whitespace-nowrap truncate" style={{ minWidth: '120px', maxWidth: '180px' }}>
                     {product.supplier_name || '-'}
                   </div>
                   
-                  {/* Стоимость */}
-                  <div className="text-gray-900 whitespace-nowrap text-right" style={{ minWidth: '90px' }}>
+                  {/* Закупочная цена */}
+                  <div className="text-gray-700 whitespace-nowrap text-right" style={{ minWidth: '100px' }}>
+                    {formatPrice(product.purchase_price || product.price)}
+                  </div>
+                  
+                  {/* Надбавка (редактируемая) */}
+                  <div className="text-gray-900 whitespace-nowrap text-right" style={{ minWidth: '100px' }}>
+                    {editingMarkupId === product.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={markupValue}
+                          onChange={(e) => setMarkupValue(e.target.value)}
+                          className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+                          step="0.01"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveMarkup(product.id)
+                            } else if (e.key === 'Escape') {
+                              setEditingMarkupId(null)
+                              setMarkupValue('')
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveMarkup(product.id)}
+                          className="p-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                          title="Сохранить"
+                        >
+                          <Save className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingMarkupId(null)
+                            setMarkupValue('')
+                          }}
+                          className="p-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                          title="Отмена"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span 
+                        className="cursor-pointer hover:text-primary-600 hover:underline"
+                        onClick={() => handleEditMarkup(product)}
+                        title="Нажмите для редактирования надбавки"
+                      >
+                        {formatPrice(product.markup || 0)}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Продажная цена */}
+                  <div className="text-gray-900 whitespace-nowrap text-right font-semibold" style={{ minWidth: '100px' }}>
                     {formatPrice(product.price)}
                   </div>
                   

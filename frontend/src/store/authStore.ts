@@ -21,30 +21,46 @@ export const useAuthStore = create<AuthState>()((set) => ({
       isInitialized: false,
 
       login: async (email: string, password: string) => {
-        const response: LoginResponse = await authApi.login(email, password)
-        const { access_token, user } = response
-        
-        console.log('Login response:', { access_token: access_token ? 'present' : 'missing', user }) // Debug
-        
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+        try {
+          console.log('🔍 authStore.login: Starting login for', email)
+          
+          const response: LoginResponse = await authApi.login(email, password)
+          const { access_token, user } = response
+          
+          if (!access_token) {
+            throw new Error('Токен не получен от сервера')
+          }
+          
+          if (!user) {
+            throw new Error('Данные пользователя не получены от сервера')
+          }
+          
+          console.log('✅ authStore.login: Login successful', { 
+            hasToken: !!access_token, 
+            user: { id: user.id, email: user.email, is_admin: user.is_admin } 
+          })
+          
+          // Устанавливаем токен в axios
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
-        // Сохраняем в localStorage
-        const authData = {
-          token: access_token,
-          isAuthenticated: true,
-          user: user || {
-            id: 0,
-            email,
-            full_name: '',
-            company: '',
-            is_verified: true,
-            is_admin: false,
-          },
+          // Сохраняем в localStorage
+          const authData = {
+            token: access_token,
+            isAuthenticated: true,
+            user: user,
+          }
+          
+          localStorage.setItem('auth-storage', JSON.stringify({ state: authData }))
+          console.log('💾 authStore.login: Auth data saved to localStorage')
+
+          // Обновляем состояние
+          set(authData)
+          console.log('✅ authStore.login: State updated')
+        } catch (error: any) {
+          console.error('❌ authStore.login: Error occurred', error)
+          // Пробрасываем ошибку дальше, чтобы Login.tsx мог её обработать
+          throw error
         }
-        console.log('Saving auth data:', { ...authData, token: 'present' }) // Debug
-        localStorage.setItem('auth-storage', JSON.stringify({ state: authData }))
-
-        set(authData)
       },
 
       register: async (data: RegisterData) => {

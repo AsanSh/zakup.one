@@ -21,7 +21,9 @@ export interface Product {
   name: string
   article?: string
   unit?: string
-  price: number
+  purchase_price?: number  // Закупочная цена из прайс-листа
+  markup?: number  // Надбавка в сомах
+  price: number  // Продажная цена (purchase_price + markup)
   category?: string
   country?: string
   is_active?: boolean
@@ -149,6 +151,7 @@ export interface OrderCreateData {
 // Обновление товара
 export interface ProductUpdateData {
   price?: number
+  markup?: number  // Надбавка в сомах
   is_active?: boolean
   category?: string
   country?: string

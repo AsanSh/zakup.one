@@ -76,38 +76,70 @@ export default function AdminPriceLists() {
         file: null,
       })
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Ошибка загрузки прайс-листа')
+      console.error('Ошибка загрузки прайс-листа:', err)
+      
+      if (err.response?.status === 401) {
+        alert('Сессия истекла. Пожалуйста, войдите заново.')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+        return
+      }
+      
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка загрузки прайс-листа'
+      // Убираем неправильное сообщение о базе данных для ошибок аутентификации
+      if (errorMessage.includes('База данных недоступна') && err.response?.status === 401) {
+        alert('Сессия истекла. Пожалуйста, войдите заново.')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+      } else {
+        alert(errorMessage)
+      }
     } finally {
       setUploading(false)
     }
   }
 
   const handleDownloadAndImport = async () => {
-    if (!downloadForm.supplier_id || !downloadForm.download_url) {
-      alert('Выберите поставщика и укажите URL для скачивания')
+    if (!downloadForm.supplier_id || !downloadForm.file) {
+      alert('Выберите поставщика и файл для загрузки')
       return
     }
 
     try {
       setUploading(true)
-      const result = await adminApi.downloadAndImportPriceList(
+      const result = await adminApi.importPriceList(
+        downloadForm.file,
         parseInt(downloadForm.supplier_id),
-        downloadForm.download_url,
-        downloadForm.frequency,
         parseInt(downloadForm.header_row),
         parseInt(downloadForm.start_row)
       )
-      alert(`Прайс-лист успешно скачан и импортирован!\nДобавлено: ${result.imported}\nОбновлено: ${result.updated}`)
+      alert(`Прайс-лист успешно загружен и импортирован!\nДобавлено: ${result.imported}`)
       setShowDownloadModal(false)
       setDownloadForm({
         supplier_id: '',
-        download_url: '',
-        frequency: 'manual',
+        file: null,
         header_row: '7',
         start_row: '8',
       })
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Ошибка скачивания и импорта прайс-листа')
+      console.error('Ошибка загрузки и импорта:', err)
+      
+      if (err.response?.status === 401) {
+        alert('Сессия истекла. Пожалуйста, войдите заново.')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+        return
+      }
+      
+      const errorMessage = err.response?.data?.detail || err.response?.data?.error || err.message || 'Ошибка загрузки и импорта прайс-листа'
+      // Убираем неправильное сообщение о базе данных для ошибок аутентификации
+      if (errorMessage.includes('База данных недоступна') && err.response?.status === 401) {
+        alert('Сессия истекла. Пожалуйста, войдите заново.')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+      } else {
+        alert(`Ошибка: ${errorMessage}`)
+      }
     } finally {
       setUploading(false)
     }

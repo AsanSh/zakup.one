@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api/api'
+import { adminApi } from '../../shared/api'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 
 interface Counterparty {
@@ -28,7 +28,7 @@ export default function AdminCounterparties() {
   const fetchCounterparties = async () => {
     try {
       setLoading(true)
-      const users = await api.admin.getUsers()
+      const users = await adminApi.getUsers()
       // Преобразуем пользователей в контрагентов
       setCounterparties(
         users.map((u: any) => ({
@@ -47,10 +47,10 @@ export default function AdminCounterparties() {
     try {
       // TODO: Реализовать обновление уровня доступа через API
       if (accessForm.access_level === 'full') {
-        await api.admin.verifyUser(userId)
-        await api.admin.activateUser(userId)
+        await adminApi.verifyUser(userId)
+        await adminApi.activateUser(userId)
       } else if (accessForm.access_level === 'restricted') {
-        await api.admin.deactivateUser(userId)
+        await adminApi.deactivateUser(userId)
       }
       setSelectedUser(null)
       fetchCounterparties()

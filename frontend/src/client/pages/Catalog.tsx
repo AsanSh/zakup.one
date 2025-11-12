@@ -52,7 +52,7 @@ export default function Search() {
       try {
         // Если запрос пустой или меньше 2 символов, показываем все товары
         const searchQuery = debouncedQuery.length >= 2 ? debouncedQuery : ""
-        const results = await clientApi.searchProducts(searchQuery, 100)
+        const results = await clientApi.searchProducts(searchQuery, 10000)  // Увеличен лимит для отображения всех товаров
         setProducts(results)
         // Показываем dropdown только если есть запрос >= 2 символов
         if (debouncedQuery.length >= 2) {

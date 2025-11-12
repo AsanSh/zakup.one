@@ -1,7 +1,7 @@
 """
 API эндпоинты для админ-панели
 """
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Form, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
@@ -40,6 +40,14 @@ class SupplierResponse(BaseModel):
         from_attributes = True
 
 
+class DownloadPriceListRequest(BaseModel):
+    supplier_id: int
+    download_url: str
+    frequency: str = "manual"
+    header_row: int = 7
+    start_row: int = 8
+
+
 @router.get("/suppliers", response_model=List[SupplierResponse])
 async def get_suppliers(
     db: Session = Depends(get_db),
@@ -71,17 +79,15 @@ async def create_supplier(
 @router.post("/import-price-list")
 async def import_price_list(
     file: UploadFile = File(...),
-    supplier_id: int = None,
-    header_row: int = 7,
-    start_row: int = 8,
+    supplier_id: int = Form(...),
+    header_row: int = Form(7),
+    start_row: int = Form(8),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
     """
     Загрузка и импорт прайс-листа
     """
-    if not supplier_id:
-        raise HTTPException(status_code=400, detail="Не указан supplier_id")
     
     # Создаем директорию для загрузок
     upload_dir = Path("uploads")
@@ -93,14 +99,62 @@ async def import_price_list(
         shutil.copyfileobj(file.file, buffer)
     
     try:
-        # Импортируем товары
-        import_service = PriceImportService(db)
-        result = import_service.import_from_file(
-            str(file_path),
-            supplier_id=supplier_id,
-            header_row=header_row,
-            start_row=start_row
-        )
+        # Проверяем поставщика для определения парсера
+        supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Поставщик не найден")
+        
+        # Используем специальный парсер для Стройдвор
+        if 'stroydvor' in supplier.name.lower():
+            try:
+                from app.services.stroydvor_parser import StroydvorParser
+                from app.services.price_list_downloader import PriceListDownloader
+                
+                parser = StroydvorParser(str(file_path))
+                products_data = parser.parse()
+                
+                if not products_data:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="Парсер не нашел товары в файле. Проверьте формат файла."
+                    )
+                
+                # Импортируем через метод downloader
+                downloader = PriceListDownloader(db)
+                result = downloader._import_products_from_data(
+                    products_data,
+                    supplier_id,
+                    header_row,
+                    start_row
+                )
+                
+                if not result.get('success', True):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=result.get('error', 'Ошибка импорта товаров')
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Ошибка парсинга файла Стройдвор: {str(e)}"
+                )
+        else:
+            # Используем стандартный импорт
+            import_service = PriceImportService(db)
+            result = import_service.import_from_file(
+                str(file_path),
+                supplier_id=supplier_id,
+                header_row=header_row,
+                start_row=start_row
+            )
+            
+            if not result.get('success', True):
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.get('error', 'Ошибка импорта товаров')
+                )
         
         # Удаляем временный файл
         os.remove(file_path)
@@ -283,7 +337,7 @@ async def update_order_status(
 @router.get("/products", response_model=List[dict])
 async def get_all_products(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(10000, ge=1, le=50000),  # Увеличен лимит до 10000, максимум 50000
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -295,7 +349,9 @@ async def get_all_products(
             "name": product.name,
             "article": product.article,
             "unit": product.unit,
-            "price": product.price,
+            "purchase_price": product.purchase_price,  # Закупочная цена
+            "markup": product.markup or 0.0,  # Надбавка
+            "price": product.price,  # Продажная цена
             "category": product.category,
             "country": product.country,
             "is_active": product.is_active,
@@ -308,6 +364,7 @@ async def get_all_products(
 
 class ProductUpdate(BaseModel):
     price: Optional[float] = None
+    markup: Optional[float] = None  # Надбавка в сомах
     is_active: Optional[bool] = None
     category: Optional[str] = None
     country: Optional[str] = None
@@ -325,8 +382,18 @@ async def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
     
+    # Обновляем надбавку
+    if product_data.markup is not None:
+        product.markup = product_data.markup
+        # Пересчитываем продажную цену
+        product.price = product.purchase_price + product.markup
+    
+    # Если напрямую обновляется цена, обновляем и надбавку
     if product_data.price is not None:
         product.price = product_data.price
+        # Пересчитываем надбавку
+        product.markup = product_data.price - product.purchase_price
+    
     if product_data.is_active is not None:
         product.is_active = product_data.is_active
     if product_data.category is not None:
@@ -340,6 +407,8 @@ async def update_product(
     return {
         "id": product.id,
         "name": product.name,
+        "purchase_price": product.purchase_price,
+        "markup": product.markup or 0.0,
         "price": product.price,
         "is_active": product.is_active,
         "category": product.category,
@@ -374,16 +443,23 @@ async def bulk_update_prices(
             if price_change_type == "percent":
                 # Изменение на процент
                 new_price = product.price * (1 + price_value / 100)
+                # Пересчитываем надбавку как разницу между новой ценой и закупочной
+                new_markup = new_price - product.purchase_price
             elif price_change_type == "fixed":
                 # Изменение на фиксированную сумму
                 new_price = product.price + price_value
+                # Добавляем фиксированную сумму к надбавке
+                new_markup = (product.markup or 0.0) + price_value
             else:
                 continue
             
             if new_price < 0:
                 new_price = 0
+            if new_markup < 0:
+                new_markup = 0
             
             product.price = new_price
+            product.markup = new_markup
             updated_count += 1
         
         db.commit()
@@ -603,76 +679,98 @@ async def get_orders_stats(
 
 @router.post("/price-lists/download-and-import")
 async def download_and_import_price_list(
-    supplier_id: int,
-    download_url: str,
-    frequency: str = "manual",
-    header_row: int = 7,
-    start_row: int = 8,
+    request: DownloadPriceListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
     """Скачать прайс-лист по URL и импортировать товары"""
     try:
-        supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+        supplier = db.query(Supplier).filter(Supplier.id == request.supplier_id).first()
         if not supplier:
             raise HTTPException(status_code=404, detail="Поставщик не найден")
         
         # Скачиваем файл
         downloader = PriceListDownloader(db)
-        file_path = downloader.download_price_list(download_url, supplier.name)
+        file_path = downloader.download_price_list(request.download_url, supplier.name)
         
         if not file_path:
             raise HTTPException(status_code=500, detail="Не удалось скачать файл")
         
         # Импортируем товары
         # Используем специальный парсер для Стройдвор
-        if 'stroydvor' in download_url.lower():
-            from app.services.stroydvor_parser import StroydvorParser
-            parser = StroydvorParser(file_path)
-            products_data = parser.parse()
-            
-            # Импортируем через метод downloader
-            result = downloader._import_products_from_data(
-                products_data,
-                supplier_id,
-                header_row,
-                start_row
-            )
+        if 'stroydvor' in request.download_url.lower():
+            try:
+                from app.services.stroydvor_parser import StroydvorParser
+                parser = StroydvorParser(file_path)
+                products_data = parser.parse()
+                
+                if not products_data:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="Парсер не нашел товары в файле. Проверьте формат файла."
+                    )
+                
+                # Импортируем через метод downloader
+                result = downloader._import_products_from_data(
+                    products_data,
+                    request.supplier_id,
+                    request.header_row,
+                    request.start_row
+                )
+                
+                if not result.get('success', True):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=result.get('error', 'Ошибка импорта товаров')
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Ошибка парсинга файла Стройдвор: {str(e)}"
+                )
         else:
             # Используем стандартный импорт
             import_service = PriceImportService(db)
             result = import_service.import_from_file(
                 file_path,
-                supplier_id=supplier_id,
-                header_row=header_row,
-                start_row=start_row
+                supplier_id=request.supplier_id,
+                header_row=request.header_row,
+                start_row=request.start_row
             )
+            
+            if not result.get('success', True):
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.get('error', 'Ошибка импорта товаров')
+                )
         
         # Создаем или обновляем запись автоматического обновления
         price_update = db.query(PriceListUpdate).filter(
-            PriceListUpdate.supplier_id == supplier_id,
-            PriceListUpdate.download_url == download_url
+            PriceListUpdate.supplier_id == request.supplier_id,
+            PriceListUpdate.download_url == request.download_url
         ).first()
         
         if not price_update:
             price_update = PriceListUpdate(
-                supplier_id=supplier_id,
-                download_url=download_url,
-                frequency=UpdateFrequency(frequency),
-                header_row=header_row,
-                start_row=start_row,
+                supplier_id=request.supplier_id,
+                download_url=request.download_url,
+                frequency=UpdateFrequency(request.frequency),
+                header_row=request.header_row,
+                start_row=request.start_row,
                 is_active=True
             )
             db.add(price_update)
         else:
-            price_update.frequency = UpdateFrequency(frequency)
-            price_update.header_row = header_row
-            price_update.start_row = start_row
+            price_update.frequency = UpdateFrequency(request.frequency)
+            price_update.header_row = request.header_row
+            price_update.start_row = request.start_row
         
         # Вычисляем следующее обновление
-        if frequency != "manual":
+        if request.frequency != "manual":
             price_update.next_update = downloader._calculate_next_update(
-                UpdateFrequency(frequency)
+                UpdateFrequency(request.frequency)
             )
         
         price_update.last_update = datetime.utcnow()

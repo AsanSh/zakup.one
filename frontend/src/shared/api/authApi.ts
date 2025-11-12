@@ -4,7 +4,7 @@
 import axios from 'axios'
 import type { User } from '../types'
 
-const API_URL = '/api/v1'
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 export interface LoginResponse {
   access_token: string

@@ -3,7 +3,7 @@
  */
 import axios from 'axios'
 
-const API_URL = '/api/v1'
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 // Создаем экземпляр axios с базовой конфигурацией
 const apiClient = axios.create({
@@ -44,12 +44,19 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     // Если ошибка 401 (Unauthorized), перенаправляем на страницу входа
+    // НО исключаем сам endpoint логина, чтобы не создавать цикл
     if (error.response?.status === 401) {
-      // Очищаем токен
-      localStorage.removeItem('auth-storage')
-      // Перенаправляем на страницу входа
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      const requestUrl = error.config?.url || ''
+      const isLoginEndpoint = requestUrl.includes('/auth/login')
+      
+      // Не обрабатываем 401 для endpoint логина - пусть Login.tsx сам обработает
+      if (!isLoginEndpoint) {
+        // Очищаем токен
+        localStorage.removeItem('auth-storage')
+        // Перенаправляем на страницу входа только если мы не на странице логина
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
       }
     }
     return Promise.reject(error)

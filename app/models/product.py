@@ -32,7 +32,9 @@ class Product(Base):
     name = Column(String, nullable=False, index=True)
     article = Column(String, index=True)  # Артикул
     unit = Column(String)  # Единица измерения (шт, м, кг, м³ и т.д.)
-    price = Column(Float, nullable=False)
+    purchase_price = Column(Float, nullable=False)  # Закупочная цена из прайс-листа
+    markup = Column(Float, default=0.0)  # Надбавка в сомах
+    price = Column(Float, nullable=False)  # Продажная цена (purchase_price + markup)
     category = Column(String, index=True)
     description = Column(Text)
     country = Column(String)  # Страна производства (КР, РК, РФ, Китай и т.д.)

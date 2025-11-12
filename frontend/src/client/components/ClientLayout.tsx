@@ -4,11 +4,11 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useCartStore } from '../../store/cartStore'
-import { ShoppingCart, Search, FileText, LogOut, User } from 'lucide-react'
+import { ShoppingCart, Search, FileText, LogOut, User, LayoutDashboard } from 'lucide-react'
 
 export default function ClientLayout() {
   const location = useLocation()
-  const { logout } = useAuthStore()
+  const { logout, user } = useAuthStore()
   const { getItemCount } = useCartStore()
   const cartItemCount = getItemCount()
 
@@ -57,6 +57,16 @@ export default function ClientLayout() {
             </nav>
 
             <div className="flex items-center space-x-4">
+              {user?.is_admin && (
+                <Link
+                  to="/admin"
+                  className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors border border-gray-200"
+                  title="Вернуться в админ-панель"
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  <span>Админ-панель</span>
+                </Link>
+              )}
               <Link
                 to="/profile"
                 className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${

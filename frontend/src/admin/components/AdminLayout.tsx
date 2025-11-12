@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Building2,
+  Store,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -89,7 +90,15 @@ export default function AdminLayout() {
           </nav>
 
           {/* User info */}
-          <div className="px-4 py-4 border-t border-gray-200">
+          <div className="px-4 py-4 border-t border-gray-200 space-y-2">
+            <Link
+              to="/search"
+              onClick={() => setSidebarOpen(false)}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors border border-primary-200"
+            >
+              <Store className="h-4 w-4" />
+              <span>Клиентская часть</span>
+            </Link>
             <div className="flex items-center space-x-3 mb-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -120,6 +129,14 @@ export default function AdminLayout() {
               </Link>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                to="/search"
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Перейти в клиентскую часть"
+              >
+                <Store className="h-5 w-5" />
+                <span className="hidden sm:inline">Клиентская часть</span>
+              </Link>
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden text-gray-500 hover:text-gray-700"

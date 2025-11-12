@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api/api'
+import { adminApi } from '../../shared/api'
 import { Loader2, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function AdminPriceManagement() {
@@ -19,7 +19,7 @@ export default function AdminPriceManagement() {
 
   const fetchSuppliers = async () => {
     try {
-      const data = await api.admin.getSuppliers()
+      const data = await adminApi.getSuppliers()
       setSuppliers(data)
     } catch (err: any) {
       console.error('Ошибка загрузки поставщиков:', err)
@@ -33,7 +33,7 @@ export default function AdminPriceManagement() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const data = await api.admin.getProducts(0, 500)
+      const data = await adminApi.getProducts(0, 500)
       setProducts(data)
     } catch (err: any) {
       console.error('Ошибка загрузки товаров:', err)
@@ -49,7 +49,7 @@ export default function AdminPriceManagement() {
     }
 
     try {
-      const result = await api.admin.bulkUpdatePrices({
+      const result = await adminApi.bulkUpdatePrices({
         type: bulkAction.type,
         value: parseFloat(bulkAction.value),
         category: bulkAction.category || undefined,

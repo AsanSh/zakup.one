@@ -73,9 +73,15 @@ class PriceImportService:
                         Product.supplier_id == supplier_id
                     ).first()
                     
+                    purchase_price = float(product_data.get('цена', 0.0) or 0.0)
+                    
                     if existing_product:
                         # Обновляем существующий товар
-                        existing_product.price = product_data.get('цена') or existing_product.price
+                        # Сохраняем надбавку, если она была установлена
+                        markup = existing_product.markup or 0.0
+                        existing_product.purchase_price = purchase_price
+                        existing_product.markup = markup
+                        existing_product.price = purchase_price + markup  # Продажная цена
                         existing_product.unit = product_data.get('единица_измерения') or existing_product.unit
                         existing_product.updated_at = pd.Timestamp.now()
                         updated_count += 1
@@ -84,7 +90,9 @@ class PriceImportService:
                         new_product = Product(
                             name=product_data['название'],
                             unit=product_data.get('единица_измерения', ''),
-                            price=product_data.get('цена', 0.0) or 0.0,
+                            purchase_price=purchase_price,  # Закупочная цена из прайс-листа
+                            markup=0.0,  # Надбавка по умолчанию 0
+                            price=purchase_price,  # Продажная цена = закупочная (без надбавки)
                             supplier_id=supplier_id,
                             is_active=True
                         )

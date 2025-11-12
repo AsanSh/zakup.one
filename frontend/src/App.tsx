@@ -38,10 +38,10 @@ const AdminUserFinance = lazy(() => import('./admin/pages/AdminUserFinance'))
 
 /**
  * Защищенный роут - требует аутентификации
- * Администраторы перенаправляются в админ-панель
+ * Администраторы могут видеть клиентскую часть для проверки интерфейса
  */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user, isInitialized } = useAuthStore()
+  const { isAuthenticated, isInitialized } = useAuthStore()
   
   // Ждем инициализации перед проверкой
   if (!isInitialized) {
@@ -56,12 +56,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />
   }
   
-  // Если пользователь - администратор, перенаправляем в админ-панель
-  if (user?.is_admin) {
-    console.log('ProtectedRoute: User is admin, redirecting to /admin') // Debug
-    return <Navigate to="/admin" replace />
-  }
-  
+  // Разрешаем доступ всем аутентифицированным пользователям (включая админов)
   return <>{children}</>
 }
 

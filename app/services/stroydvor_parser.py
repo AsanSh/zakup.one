@@ -1,6 +1,16 @@
 """
 Парсер прайс-листа Стройдвор
 Специальный парсер для формата Excel от stroydvor.kg
+
+Структура файла:
+- Строка 8: Заголовки ['Товар', nan, 'Ед.изм', 'Цена']
+- Колонка 0: Название товара или категория
+- Колонка 1: пустая
+- Колонка 2: Единица измерения (шт, кг и т.д.) ИЛИ цена (если это категория)
+- Колонка 3: Цена (если есть единица измерения в колонке 2)
+
+Категории: в колонке 0 название, в колонке 2 число (цена), в колонке 3 пусто
+Товары: в колонке 0 название, в колонке 2 единица измерения, в колонке 3 цена
 """
 import pandas as pd
 from pathlib import Path
@@ -21,7 +31,13 @@ class StroydvorParser:
         Парсит Excel файл и возвращает список товаров с категориями
         
         Returns:
-            Список словарей с товарами
+            Список словарей с товарами в формате:
+            {
+                'name': str,
+                'price': float,
+                'unit': str,
+                'category': str
+            }
         """
         try:
             # Читаем Excel файл
@@ -29,30 +45,42 @@ class StroydvorParser:
             
             products = []
             current_category = None
+            header_row = None
             
-            # Проходим по всем строкам
-            for idx, row in df.iterrows():
-                row_values = [str(val).strip() if pd.notna(val) else '' for val in row.values]
+            # Ищем строку с заголовками (обычно строка 8, индекс 8)
+            for idx in range(min(15, len(df))):
+                row_text = ' '.join([
+                    str(val).lower() if pd.notna(val) else '' 
+                    for val in df.iloc[idx].values
+                ])
+                if 'товар' in row_text and ('ед' in row_text or 'изм' in row_text) and 'цена' in row_text:
+                    header_row = idx
+                    break
+            
+            if header_row is None:
+                header_row = 8  # По умолчанию
+            
+            # Проходим по всем строкам начиная с заголовков
+            for idx in range(header_row + 1, len(df)):
+                row = df.iloc[idx]
                 
-                # Ищем категорию (обычно в первой колонке, жирный текст или заголовок)
-                # Категория обычно содержит только текст без цифр в начале
-                first_col = row_values[0] if len(row_values) > 0 else ''
-                
-                # Проверяем, является ли строка категорией
-                if self._is_category_row(row_values):
-                    current_category = first_col
-                    continue
+                # Получаем значения колонок
+                col0 = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) and len(row) > 0 else ''
+                col2 = str(row.iloc[2]).strip() if len(row) > 2 and pd.notna(row.iloc[2]) else ''
+                col3 = str(row.iloc[3]).strip() if len(row) > 3 and pd.notna(row.iloc[3]) else ''
                 
                 # Пропускаем пустые строки
-                if not any(row_values):
+                if not col0:
                     continue
                 
-                # Пропускаем строки заголовков
-                if self._is_header_row(row_values):
+                # Проверяем, является ли строка категорией
+                # Категория: в колонке 0 название, в колонке 2 число (цена), в колонке 3 пусто
+                if self._is_category_row(col0, col2, col3):
+                    current_category = col0
                     continue
                 
                 # Парсим товар
-                product = self._parse_product_row(row_values, current_category)
+                product = self._parse_product_row(col0, col2, col3, current_category)
                 if product:
                     products.append(product)
             
@@ -64,99 +92,91 @@ class StroydvorParser:
             traceback.print_exc()
             return []
     
-    def _is_category_row(self, row_values: List[str]) -> bool:
-        """Проверяет, является ли строка категорией"""
-        if not row_values or not row_values[0]:
+    def _is_category_row(self, col0: str, col2: str, col3: str) -> bool:
+        """
+        Проверяет, является ли строка категорией
+        
+        Категория определяется так:
+        - В колонке 0 есть название (ДВП, ДСП, ОСП и т.д.)
+        - В колонке 2 число (цена категории), а в колонке 3 пусто
+        - Название короткое (обычно 2-10 символов) и не содержит размеры/характеристики
+        """
+        if not col0 or len(col0) < 2:
             return False
         
-        first_col = row_values[0]
-        
-        # Категория обычно:
-        # - Не содержит цену (нет чисел с запятой/точкой в конце)
-        # - Не содержит единицы измерения (шт, кг, м и т.д.)
-        # - Может быть в верхнем регистре или с заглавными буквами
-        
-        # Проверяем наличие цены (число с запятой или точкой)
-        has_price = False
-        for val in row_values[1:]:
-            if val and re.search(r'\d+[.,]\d+', str(val)):
-                has_price = True
-                break
-        
-        # Если есть цена, это не категория
-        if has_price:
+        # Если колонка 3 не пустая, это не категория
+        if col3 and col3.strip():
             return False
         
-        # Проверяем единицы измерения
-        units = ['шт', 'кг', 'м', 'м²', 'м³', 'л', 'т', 'упак', 'мешок', 'рулон']
-        has_unit = any(unit in str(val).lower() for val in row_values for unit in units)
-        
-        if has_unit:
-            return False
-        
-        # Если первая колонка не пустая и нет цены/единиц, возможно это категория
-        # Но нужно проверить, что это не просто название товара
-        if len(first_col) > 3 and not re.search(r'\d', first_col):
-            # Проверяем, что в строке нет других значимых данных
-            non_empty = [v for v in row_values[1:] if v and len(str(v)) > 2]
-            if len(non_empty) == 0:
-                return True
+        # Проверяем, является ли col2 числом (цена категории)
+        # Категория имеет цену в колонке 2, но не единицу измерения
+        if col2 and col2.strip():
+            # Проверяем, является ли это числом (может быть с пробелами)
+            col2_clean = col2.replace(' ', '').replace(',', '.')
+            try:
+                float(col2_clean)
+                # Если это число, проверяем что это не единица измерения
+                units = ['шт', 'кг', 'м', 'м²', 'м³', 'л', 'т', 'упак', 'мешок', 'рулон', 'м2', 'м3']
+                col2_lower = col2.lower()
+                if any(unit in col2_lower for unit in units):
+                    return False  # Это единица измерения, не категория
+                # Это число и не единица измерения - вероятно категория
+                # Но нужно проверить, что название не слишком длинное (категории обычно короткие)
+                if len(col0) <= 20 and not re.search(r'\d+[хx]\d+', col0.lower()):
+                    # Название короткое и не содержит размеры (например, "2,5х1700")
+                    return True
+            except ValueError:
+                pass
         
         return False
     
-    def _is_header_row(self, row_values: List[str]) -> bool:
-        """Проверяет, является ли строка заголовком"""
-        if not row_values:
-            return False
+    def _parse_product_row(self, col0: str, col2: str, col3: str, category: Optional[str] = None) -> Optional[Dict]:
+        """
+        Парсит строку с товаром
         
-        # Заголовки обычно содержат слова: название, цена, единица и т.д.
-        header_keywords = ['наименование', 'название', 'товар', 'цена', 'единица', 
-                          'ед.изм', 'количество', 'артикул', 'категория']
+        Args:
+            col0: Название товара
+            col2: Единица измерения или пусто
+            col3: Цена или пусто
+            category: Текущая категория
         
-        row_text = ' '.join([str(v).lower() for v in row_values])
-        return any(keyword in row_text for keyword in header_keywords)
-    
-    def _parse_product_row(self, row_values: List[str], category: Optional[str] = None) -> Optional[Dict]:
-        """Парсит строку с товаром"""
-        if not row_values or not row_values[0]:
+        Returns:
+            Словарь с данными товара или None
+        """
+        if not col0 or len(col0) < 2:
             return None
         
-        # Название товара обычно в первой колонке
-        name = row_values[0].strip()
-        if not name or len(name) < 2:
-            return None
+        # Единицы измерения
+        units = ['шт', 'кг', 'м', 'м²', 'м³', 'л', 'т', 'упак', 'мешок', 'рулон', 'м2', 'м3']
         
-        # Ищем цену (обычно число с запятой или точкой)
-        price = None
+        # Определяем единицу измерения и цену
         unit = None
+        price = None
         
-        for val in row_values[1:]:
-            if not val:
-                continue
-            
-            val_str = str(val).strip()
-            
-            # Пытаемся найти цену (число с запятой/точкой)
-            price_match = re.search(r'(\d+[.,]\d+|\d+)', val_str.replace(' ', ''))
-            if price_match:
-                try:
-                    price_str = price_match.group(1).replace(',', '.')
-                    price = float(price_str)
-                    # Если цена найдена, следующее значение может быть единицей
-                    continue
-                except:
-                    pass
-            
-            # Ищем единицу измерения
-            units = ['шт', 'кг', 'м', 'м²', 'м³', 'л', 'т', 'упак', 'мешок', 'рулон', 'м2', 'м3']
-            val_lower = val_str.lower()
+        # Проверяем колонку 2 - может быть единица измерения
+        if col2 and col2.strip():
+            col2_lower = col2.lower()
+            # Проверяем, является ли это единицей измерения
             for u in units:
-                if u in val_lower:
+                if u in col2_lower:
                     unit = u
                     break
             
-            if unit:
-                break
+            # Если не единица измерения, возможно это цена (для старых форматов)
+            if not unit:
+                try:
+                    col2_clean = col2.replace(' ', '').replace(',', '.')
+                    price = float(col2_clean)
+                except ValueError:
+                    pass
+        
+        # Проверяем колонку 3 - должна быть цена, если есть единица измерения
+        if col3 and col3.strip():
+            try:
+                col3_clean = col3.replace(' ', '').replace(',', '.')
+                price = float(col3_clean)
+            except ValueError:
+                pass
         
         # Если цена не найдена, пропускаем товар
         if price is None:
@@ -167,7 +187,7 @@ class StroydvorParser:
             unit = 'шт'
         
         return {
-            'name': name,
+            'name': col0,
             'price': price,
             'unit': unit,
             'category': category or 'Разное'

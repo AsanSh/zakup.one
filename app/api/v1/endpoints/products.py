@@ -27,7 +27,7 @@ class ProductResponse(BaseModel):
 @router.get("/search", response_model=List[ProductResponse])
 async def search_products(
     q: str = Query("", description="Поисковый запрос"),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(10000, ge=1, le=50000),  # Увеличен лимит для синхронизации с админкой
     db: Session = Depends(get_db)
 ):
     """

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api/api'
+import { adminApi } from '../../shared/api'
 import { Loader2 } from 'lucide-react'
 
 interface Order {
@@ -52,7 +52,7 @@ export default function AdminOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      const data = await api.admin.getOrders()
+      const data = await adminApi.getOrders()
       setOrders(data)
     } catch (err: any) {
       console.error('Ошибка загрузки заявок:', err)
@@ -63,12 +63,11 @@ export default function AdminOrders() {
 
   const handleStatusUpdate = async (orderId: number) => {
     try {
-      await api.admin.updateOrderStatus(
-        orderId,
-        statusForm.status,
-        statusForm.tracking_number || undefined,
-        statusForm.estimated_delivery_date || undefined
-      )
+      await adminApi.updateOrderStatus(orderId, {
+        status: statusForm.status,
+        tracking_number: statusForm.tracking_number || undefined,
+        estimated_delivery_date: statusForm.estimated_delivery_date || undefined,
+      })
       setSelectedOrder(null)
       setStatusForm({ status: '', tracking_number: '', estimated_delivery_date: '' })
       fetchOrders()
