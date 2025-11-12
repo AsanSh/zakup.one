@@ -223,5 +223,123 @@ export const adminApi = {
     const response = await apiClient.post(`/admin/price-lists/updates/${updateId}/run`)
     return response.data
   },
+
+  // Получить информацию о прайс-листах всех поставщиков
+  getSuppliersPriceLists: async (): Promise<Array<{
+    id: number
+    name: string
+    contact_email?: string
+    contact_phone?: string
+    is_active: boolean
+    product_count: number
+    active_product_count: number
+    price_list_updates: Array<{
+      id: number
+      download_url: string
+      frequency: string | null
+      is_active: boolean
+      last_update: string | null
+      next_update: string | null
+      last_imported_count: number
+      last_updated_count: number
+      last_error: string | null
+    }>
+    last_price_list_update: {
+      id: number
+      download_url: string
+      frequency: string | null
+      is_active: boolean
+      last_update: string | null
+      next_update: string | null
+      last_imported_count: number
+      last_updated_count: number
+      last_error: string | null
+    } | null
+  }>> => {
+    const response = await apiClient.get(`/admin/price-lists/suppliers`)
+    return response.data
+  },
+
+  getLastPriceListUpdate: async (): Promise<{
+    message?: string
+    last_update: {
+      id: number
+      supplier: {
+        id: number
+        name: string
+      }
+      download_url: string
+      frequency: string | null
+      is_active: boolean
+      last_update: string | null
+      next_update: string | null
+      last_imported_count: number
+      last_updated_count: number
+      last_error: string | null
+    } | null
+  }> => {
+    const response = await apiClient.get(`/admin/price-lists/last-update`)
+    return response.data
+  },
+
+  downloadPriceListFile: async (updateId: number | null, filePath?: string): Promise<void> => {
+    let url = ''
+    
+    if (filePath && updateId === null) {
+      // Скачиваем по пути (для временных файлов)
+      url = `/admin/price-lists/files/download-by-path?file_path=${encodeURIComponent(filePath)}`
+    } else if (updateId !== null) {
+      // Скачиваем по ID
+      url = `/admin/price-lists/files/${updateId}/download`
+    } else {
+      throw new Error('Не указан ID или путь к файлу')
+    }
+    
+    const response = await apiClient.get(url, {
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    })
+    // Создаем ссылку для скачивания
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    
+    // Получаем имя файла из заголовка или используем дефолтное
+    const contentDisposition = response.headers['content-disposition']
+    let filename = 'price_list.xlsx'
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i)
+      if (filenameMatch) {
+        filename = filenameMatch[1]
+      }
+    }
+    
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(blobUrl)
+  },
+
+  getSupplierStats: async (supplierId: number): Promise<{
+    sales_stats: {
+      total_orders: number
+      total_revenue: number
+      total_items_sold: number
+    }
+    top_products: Array<{
+      name: string
+      quantity_sold: number
+      total_revenue: number
+    }>
+  }> => {
+    const response = await apiClient.get(`/admin/suppliers/${supplierId}/stats`)
+    return response.data
+  },
 }
 

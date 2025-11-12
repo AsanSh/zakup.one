@@ -2,12 +2,13 @@
 API эндпоинты для админ-панели
 """
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Form, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.product import Product, Supplier
 from app.models.user import User
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderItem, OrderStatus
 from app.models.delivery import DeliveryTracking, DeliveryEvent, DeliveryStatus
 from app.models.price_list_update import PriceListUpdate, UpdateFrequency
 from app.services.price_import import PriceImportService
@@ -93,8 +94,16 @@ async def import_price_list(
     upload_dir = Path("uploads")
     upload_dir.mkdir(exist_ok=True)
     
+    # Создаем уникальное имя файла с timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    file_extension = Path(file.filename).suffix or '.xlsx'
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    supplier_name = supplier.name if supplier else 'unknown'
+    safe_supplier_name = "".join(c for c in supplier_name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+    unique_filename = f"{safe_supplier_name}_{timestamp}{file_extension}"
+    
     # Сохраняем файл
-    file_path = upload_dir / file.filename
+    file_path = upload_dir / unique_filename
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
@@ -156,13 +165,37 @@ async def import_price_list(
                     detail=result.get('error', 'Ошибка импорта товаров')
                 )
         
-        # Удаляем временный файл
-        os.remove(file_path)
+        # Сохраняем информацию о загруженном файле в PriceListUpdate
+        price_update = db.query(PriceListUpdate).filter(
+            PriceListUpdate.supplier_id == supplier_id,
+            PriceListUpdate.file_path == str(file_path)
+        ).first()
+        
+        if not price_update:
+            price_update = PriceListUpdate(
+                supplier_id=supplier_id,
+                download_url=f"file://{file_path}",  # Используем file:// для локальных файлов
+                file_path=str(file_path),
+                frequency=UpdateFrequency.MANUAL,
+                header_row=header_row,
+                start_row=start_row,
+                is_active=True
+            )
+            db.add(price_update)
+        
+        price_update.last_update = datetime.utcnow()
+        price_update.last_imported_count = result.get('imported', 0)
+        price_update.last_updated_count = result.get('updated', 0)
+        price_update.last_error = None
+        
+        db.commit()
+        
+        # НЕ удаляем файл - оставляем для просмотра и скачивания
         
         return result
         
     except Exception as e:
-        # Удаляем временный файл в случае ошибки
+        # Удаляем файл только в случае ошибки
         if file_path.exists():
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=str(e))
@@ -513,6 +546,72 @@ async def toggle_supplier_active(
     return {"success": True, "is_active": supplier.is_active}
 
 
+@router.get("/suppliers/{supplier_id}/stats")
+async def get_supplier_stats(
+    supplier_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить детальную статистику по поставщику"""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Поставщик не найден")
+    
+    # Получаем все товары этого поставщика
+    supplier_products = db.query(Product).filter(Product.supplier_id == supplier_id).all()
+    product_ids = [p.id for p in supplier_products]
+    
+    # Статистика по продажам (заказы с товарами этого поставщика)
+    
+    # Всего заказов с товарами этого поставщика
+    total_orders = db.query(func.count(func.distinct(OrderItem.order_id))).filter(
+        OrderItem.product_id.in_(product_ids)
+    ).scalar() or 0
+    
+    # Общая сумма продаж
+    total_revenue = db.query(func.sum(OrderItem.price * OrderItem.quantity)).filter(
+        OrderItem.product_id.in_(product_ids)
+    ).scalar() or 0.0
+    
+    # Всего проданных товаров
+    total_items_sold = db.query(func.sum(OrderItem.quantity)).filter(
+        OrderItem.product_id.in_(product_ids)
+    ).scalar() or 0
+    
+    # Топ продаваемых товаров
+    top_products_query = db.query(
+        Product.name,
+        func.sum(OrderItem.quantity).label('quantity_sold'),
+        func.sum(OrderItem.price * OrderItem.quantity).label('total_revenue')
+    ).join(
+        OrderItem, Product.id == OrderItem.product_id
+    ).filter(
+        Product.supplier_id == supplier_id
+    ).group_by(
+        Product.id, Product.name
+    ).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(10).all()
+    
+    top_products = [
+        {
+            "name": row.name,
+            "quantity_sold": int(row.quantity_sold or 0),
+            "total_revenue": float(row.total_revenue or 0.0)
+        }
+        for row in top_products_query
+    ]
+    
+    return {
+        "sales_stats": {
+            "total_orders": total_orders,
+            "total_revenue": float(total_revenue),
+            "total_items_sold": int(total_items_sold)
+        },
+        "top_products": top_products
+    }
+
+
 @router.get("/stats")
 async def get_dashboard_stats(
     db: Session = Depends(get_db),
@@ -756,6 +855,7 @@ async def download_and_import_price_list(
             price_update = PriceListUpdate(
                 supplier_id=request.supplier_id,
                 download_url=request.download_url,
+                file_path=file_path,  # Сохраняем путь к файлу
                 frequency=UpdateFrequency(request.frequency),
                 header_row=request.header_row,
                 start_row=request.start_row,
@@ -766,6 +866,7 @@ async def download_and_import_price_list(
             price_update.frequency = UpdateFrequency(request.frequency)
             price_update.header_row = request.header_row
             price_update.start_row = request.start_row
+            price_update.file_path = file_path  # Обновляем путь к файлу
         
         # Вычисляем следующее обновление
         if request.frequency != "manual":
@@ -816,6 +917,200 @@ async def get_price_list_updates(
         }
         for update in updates
     ]
+
+
+@router.get("/price-lists/suppliers")
+async def get_suppliers_price_lists(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить информацию о прайс-листах всех поставщиков"""
+    suppliers = db.query(Supplier).all()
+    result = []
+    
+    # Получаем все файлы из папки uploads
+    upload_dir = Path("uploads")
+    upload_files = []
+    if upload_dir.exists():
+        upload_files = list(upload_dir.glob("*.xlsx")) + list(upload_dir.glob("*.xls"))
+        # Сортируем по дате изменения (новые первыми)
+        upload_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    
+    for supplier in suppliers:
+        # Получаем все обновления прайс-листов для этого поставщика
+        updates = db.query(PriceListUpdate).filter(
+            PriceListUpdate.supplier_id == supplier.id
+        ).order_by(PriceListUpdate.last_update.desc()).all()
+        
+        # Находим файлы для этого поставщика из папки uploads
+        supplier_files = []
+        safe_supplier_name = "".join(c for c in supplier.name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+        for file_path in upload_files:
+            if safe_supplier_name.lower() in file_path.name.lower():
+                # Проверяем, есть ли уже запись в БД для этого файла
+                existing_update = db.query(PriceListUpdate).filter(
+                    PriceListUpdate.file_path == str(file_path)
+                ).first()
+                
+                if not existing_update:
+                    # Создаем временную запись для отображения
+                    supplier_files.append({
+                        "id": None,  # Временный ID
+                        "file_path": str(file_path),
+                        "file_name": file_path.name,
+                        "download_url": f"file://{file_path}",
+                        "last_update": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
+                        "is_temporary": True  # Флаг, что это файл без записи в БД
+                    })
+        
+        # Подсчитываем товары
+        product_count = db.query(Product).filter(Product.supplier_id == supplier.id).count()
+        active_product_count = db.query(Product).filter(
+            Product.supplier_id == supplier.id,
+            Product.is_active == True
+        ).count()
+        
+        # Последнее обновление
+        last_update = updates[0] if updates else None
+        
+        supplier_data = {
+            "id": supplier.id,
+            "name": supplier.name,
+            "contact_email": supplier.contact_email,
+            "contact_phone": supplier.contact_phone,
+            "is_active": supplier.is_active,
+            "product_count": product_count,
+            "active_product_count": active_product_count,
+            "price_list_updates": [
+                {
+                    "id": update.id,
+                    "download_url": update.download_url,
+                    "file_path": update.file_path,
+                    "file_name": Path(update.file_path).name if update.file_path else None,
+                    "frequency": update.frequency.value if update.frequency else None,
+                    "is_active": update.is_active,
+                    "last_update": update.last_update.isoformat() if update.last_update else None,
+                    "next_update": update.next_update.isoformat() if update.next_update else None,
+                    "last_imported_count": update.last_imported_count,
+                    "last_updated_count": update.last_updated_count,
+                    "last_error": update.last_error,
+                    "is_temporary": False
+                }
+                for update in updates
+            ] + supplier_files,  # Добавляем файлы из папки uploads
+            "last_price_list_update": {
+                "id": last_update.id,
+                "download_url": last_update.download_url,
+                "file_path": last_update.file_path,
+                "file_name": Path(last_update.file_path).name if last_update.file_path else None,
+                "frequency": last_update.frequency.value if last_update.frequency else None,
+                "is_active": last_update.is_active,
+                "last_update": last_update.last_update.isoformat() if last_update.last_update else None,
+                "next_update": last_update.next_update.isoformat() if last_update.next_update else None,
+                "last_imported_count": last_update.last_imported_count,
+                "last_updated_count": last_update.last_updated_count,
+                "last_error": last_update.last_error
+            } if last_update else None
+        }
+        result.append(supplier_data)
+    
+    return result
+
+
+@router.get("/price-lists/files/{update_id}/download")
+async def download_price_list_file(
+    update_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Скачать файл прайс-листа"""
+    # Если update_id отрицательный, это временный файл (из папки uploads)
+    if update_id < 0:
+        # Получаем file_path из query параметра
+        from fastapi import Query
+        file_path_param = Query(None)
+        # Но лучше использовать другой подход - передавать file_path напрямую
+        raise HTTPException(status_code=400, detail="Используйте endpoint /price-lists/files/download-by-path")
+    
+    price_update = db.query(PriceListUpdate).filter(PriceListUpdate.id == update_id).first()
+    if not price_update:
+        raise HTTPException(status_code=404, detail="Прайс-лист не найден")
+    
+    if not price_update.file_path:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    
+    file_path = Path(price_update.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Файл не существует на сервере")
+    
+    return FileResponse(
+        path=str(file_path),
+        filename=file_path.name,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
+@router.get("/price-lists/files/download-by-path")
+async def download_price_list_file_by_path(
+    file_path: str = Query(...),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Скачать файл прайс-листа по пути"""
+    file_path_obj = Path(file_path)
+    
+    # Проверяем, что файл находится в разрешенной директории
+    upload_dir = Path("uploads")
+    downloads_dir = Path("downloads")
+    
+    if not (file_path_obj.is_relative_to(upload_dir) or file_path_obj.is_relative_to(downloads_dir)):
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+    
+    if not file_path_obj.exists():
+        raise HTTPException(status_code=404, detail="Файл не существует на сервере")
+    
+    return FileResponse(
+        path=str(file_path_obj),
+        filename=file_path_obj.name,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
+@router.get("/price-lists/last-update")
+async def get_last_price_list_update(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Получить информацию о самом последнем загруженном прайс-листе"""
+    last_update = db.query(PriceListUpdate).order_by(
+        PriceListUpdate.last_update.desc()
+    ).first()
+    
+    if not last_update:
+        return {
+            "message": "Прайс-листы еще не загружались",
+            "last_update": None
+        }
+    
+    supplier = db.query(Supplier).filter(Supplier.id == last_update.supplier_id).first()
+    
+    return {
+        "message": None,
+        "last_update": {
+            "id": last_update.id,
+            "supplier": {
+                "id": supplier.id if supplier else None,
+                "name": supplier.name if supplier else "Неизвестен"
+            },
+            "download_url": last_update.download_url,
+            "frequency": last_update.frequency.value if last_update.frequency else None,
+            "is_active": last_update.is_active,
+            "last_update": last_update.last_update.isoformat() if last_update.last_update else None,
+            "next_update": last_update.next_update.isoformat() if last_update.next_update else None,
+            "last_imported_count": last_update.last_imported_count,
+            "last_updated_count": last_update.last_updated_count,
+            "last_error": last_update.last_error
+        }
+    }
 
 
 @router.put("/price-lists/updates/{update_id}")

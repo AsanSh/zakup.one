@@ -26,6 +26,9 @@ class PriceListUpdate(Base):
     # URL для скачивания прайс-листа
     download_url = Column(String, nullable=False)
     
+    # Путь к сохраненному файлу прайс-листа
+    file_path = Column(String, nullable=True)  # Путь к сохраненному файлу
+    
     # Частота обновления
     frequency = Column(SQLEnum(UpdateFrequency), default=UpdateFrequency.MANUAL, nullable=False)
     

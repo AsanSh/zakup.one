@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminApi } from '../../shared/api'
-import { Loader2, Upload, FileSpreadsheet, Settings, DollarSign, Users, Calendar, Download } from 'lucide-react'
+import { Loader2, Upload, FileSpreadsheet, Settings, DollarSign, Users, Calendar, Download, FileDown, Edit, X } from 'lucide-react'
 
 interface Supplier {
   id: number
@@ -11,13 +11,71 @@ interface Supplier {
   is_active: boolean
 }
 
+interface PriceListInfo {
+  id: number
+  name: string
+  contact_email?: string
+  contact_phone?: string
+  is_active: boolean
+  product_count: number
+  active_product_count: number
+  price_list_updates: Array<{
+    id: number
+    download_url: string
+    file_path?: string | null
+    file_name?: string | null
+    frequency: string | null
+    is_active: boolean
+    last_update: string | null
+    next_update: string | null
+    last_imported_count: number
+    last_updated_count: number
+    last_error: string | null
+  }>
+  last_price_list_update: {
+    id: number
+    download_url: string
+    file_path?: string | null
+    file_name?: string | null
+    frequency: string | null
+    is_active: boolean
+    last_update: string | null
+    next_update: string | null
+    last_imported_count: number
+    last_updated_count: number
+    last_error: string | null
+  } | null
+}
+
+interface LastUpdateInfo {
+  id: number
+  supplier: {
+    id: number
+    name: string
+  }
+  download_url: string
+  frequency: string | null
+  is_active: boolean
+  last_update: string | null
+  next_update: string | null
+  last_imported_count: number
+  last_updated_count: number
+  last_error: string | null
+}
+
 export default function AdminPriceLists() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [priceListsInfo, setPriceListsInfo] = useState<PriceListInfo[]>([])
+  const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [showSupplierModal, setShowSupplierModal] = useState(false)
+  const [selectedSupplier, setSelectedSupplier] = useState<PriceListInfo | null>(null)
+  const [supplierStats, setSupplierStats] = useState<any>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
   const [uploadForm, setUploadForm] = useState({
     supplier_id: '',
     header_row: '7',
@@ -34,6 +92,8 @@ export default function AdminPriceLists() {
 
   useEffect(() => {
     fetchSuppliers()
+    fetchPriceListsInfo()
+    fetchLastUpdate()
   }, [])
 
   const fetchSuppliers = async () => {
@@ -50,6 +110,50 @@ export default function AdminPriceLists() {
       setSuppliers([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPriceListsInfo = async () => {
+    try {
+      const data = await adminApi.getSuppliersPriceLists()
+      setPriceListsInfo(data)
+    } catch (err: any) {
+      console.error('Ошибка загрузки информации о прайс-листах:', err)
+      // Ошибка 401 обрабатывается в axios interceptor
+      if (err.response?.status === 401) {
+        return
+      }
+    }
+  }
+
+  const fetchLastUpdate = async () => {
+    try {
+      const data = await adminApi.getLastPriceListUpdate()
+      if (data.last_update) {
+        setLastUpdate(data.last_update)
+      }
+    } catch (err: any) {
+      console.error('Ошибка загрузки последнего обновления:', err)
+      // Ошибка 401 обрабатывается в axios interceptor
+      if (err.response?.status === 401) {
+        return
+      }
+    }
+  }
+
+  const fetchSupplierStats = async (supplierId: number) => {
+    try {
+      setLoadingStats(true)
+      const stats = await adminApi.getSupplierStats(supplierId)
+      setSupplierStats(stats)
+    } catch (err: any) {
+      console.error('Ошибка загрузки статистики поставщика:', err)
+      if (err.response?.status === 401) {
+        return
+      }
+      alert('Ошибка загрузки статистики: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setLoadingStats(false)
     }
   }
 
@@ -243,34 +347,144 @@ export default function AdminPriceLists() {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Поставщики</h2>
-        <div className="space-y-4">
-          {suppliers.map((supplier) => (
-            <div
-              key={supplier.id}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-            >
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">{supplier.name}</h3>
-                {supplier.contact_email && (
-                  <p className="text-sm text-gray-600">{supplier.contact_email}</p>
-                )}
-                {supplier.contact_phone && (
-                  <p className="text-sm text-gray-600">{supplier.contact_phone}</p>
-                )}
-              </div>
-              <span
-                className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                  supplier.is_active
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {supplier.is_active ? 'Активен' : 'Неактивен'}
-              </span>
-            </div>
-          ))}
+      {/* Последний загруженный прайс-лист */}
+      {lastUpdate && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <Download className="h-5 w-5 mr-2 text-blue-600" />
+            Последний загруженный прайс-лист
+          </h2>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Поставщик:</span> {lastUpdate.supplier.name}
+            </p>
+            {lastUpdate.last_update && (
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Дата загрузки:</span>{' '}
+                {new Date(lastUpdate.last_update).toLocaleString('ru-RU')}
+              </p>
+            )}
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">URL:</span> {lastUpdate.download_url}
+            </p>
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Импортировано:</span> {lastUpdate.last_imported_count} товаров
+            </p>
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Обновлено:</span> {lastUpdate.last_updated_count} товаров
+            </p>
+            {lastUpdate.frequency && (
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Частота обновления:</span> {
+                  lastUpdate.frequency === 'daily' ? 'Ежедневно' :
+                  lastUpdate.frequency === 'weekly' ? 'Еженедельно' :
+                  lastUpdate.frequency === 'monthly' ? 'Ежемесячно' :
+                  'Вручную'
+                }
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Прайс-листы всех поставщиков - табличный формат */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">Прайс-листы всех поставщиков</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Телефон</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Кол-во товаров</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Последний прайс-лист</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {priceListsInfo.length > 0 ? (
+                priceListsInfo.map((info) => (
+                  <tr
+                    key={info.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => {
+                      setSelectedSupplier(info)
+                      setShowSupplierModal(true)
+                      fetchSupplierStats(info.id)
+                    }}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{info.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{info.contact_email || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{info.contact_phone || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {info.product_count} ({info.active_product_count} активных)
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-600">
+                        {info.last_price_list_update ? (
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {info.last_price_list_update.file_name || 'Прайс-лист'}
+                            </div>
+                            {info.last_price_list_update.last_update && (
+                              <div className="text-xs text-gray-500">
+                                {new Date(info.last_price_list_update.last_update).toLocaleDateString('ru-RU')}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Не загружался</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          info.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {info.is_active ? 'Активен' : 'Неактивен'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedSupplier(info)
+                          setShowSupplierModal(true)
+                          fetchSupplierStats(info.id)
+                        }}
+                        className="text-primary-600 hover:text-primary-900 flex items-center gap-1"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Редактировать
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    Нет информации о прайс-листах
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -365,6 +579,162 @@ export default function AdminPriceLists() {
       )}
 
       {/* Модальное окно для скачивания по URL */}
+      {/* Модальное окно со статистикой поставщика */}
+      {showSupplierModal && selectedSupplier && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-gray-900">Статистика поставщика: {selectedSupplier.name}</h2>
+              <button
+                onClick={() => {
+                  setShowSupplierModal(false)
+                  setSelectedSupplier(null)
+                  setSupplierStats(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {loadingStats ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+                </div>
+              ) : supplierStats ? (
+                <div className="space-y-6">
+                  {/* Основная информация */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="text-lg font-semibold text-gray-900">{selectedSupplier.contact_email || '-'}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Телефон</p>
+                      <p className="text-lg font-semibold text-gray-900">{selectedSupplier.contact_phone || '-'}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Товаров в базе</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {selectedSupplier.product_count} ({selectedSupplier.active_product_count} активных)
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Статус</p>
+                      <p className="text-lg font-semibold">
+                        <span className={selectedSupplier.is_active ? 'text-green-600' : 'text-red-600'}>
+                          {selectedSupplier.is_active ? 'Активен' : 'Неактивен'}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Статистика по продажам */}
+                  {supplierStats.sales_stats && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика по продажам</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Всего заказов</p>
+                          <p className="text-2xl font-bold text-gray-900">{supplierStats.sales_stats.total_orders || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Общая сумма</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {supplierStats.sales_stats.total_revenue ? 
+                              new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'KGS', minimumFractionDigits: 0 }).format(supplierStats.sales_stats.total_revenue) : 
+                              '0 сом'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Проданных товаров</p>
+                          <p className="text-2xl font-bold text-gray-900">{supplierStats.sales_stats.total_items_sold || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* История загрузки прайс-листов */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">История загрузки прайс-листов</h3>
+                    {selectedSupplier.price_list_updates.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedSupplier.price_list_updates.map((update, idx) => (
+                          <div
+                            key={update.id || idx}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200"
+                          >
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">
+                                {update.file_name || update.download_url || 'Прайс-лист'}
+                              </p>
+                              {update.last_update && (
+                                <p className="text-xs text-gray-500">
+                                  {new Date(update.last_update).toLocaleString('ru-RU')}
+                                </p>
+                              )}
+                              <div className="flex gap-4 mt-1 text-xs text-gray-600">
+                                {update.last_imported_count > 0 && (
+                                  <span>Импортировано: {update.last_imported_count}</span>
+                                )}
+                                {update.last_updated_count > 0 && (
+                                  <span>Обновлено: {update.last_updated_count}</span>
+                                )}
+                              </div>
+                            </div>
+                            {update.file_path && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  try {
+                                    await adminApi.downloadPriceListFile(update.id || null, update.file_path || undefined)
+                                  } catch (err: any) {
+                                    alert('Ошибка скачивания файла: ' + (err.response?.data?.detail || err.message))
+                                  }
+                                }}
+                                className="ml-3 px-3 py-1.5 bg-primary-600 text-white text-sm rounded hover:bg-primary-700 flex items-center gap-1"
+                              >
+                                <FileDown className="h-4 w-4" />
+                                Скачать
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Прайс-листы еще не загружались</p>
+                    )}
+                  </div>
+
+                  {/* Топ товаров */}
+                  {supplierStats.top_products && supplierStats.top_products.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ продаваемых товаров</h3>
+                      <div className="space-y-2">
+                        {supplierStats.top_products.map((product: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{product.name}</p>
+                              <p className="text-xs text-gray-500">Продано: {product.quantity_sold} шт.</p>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'KGS', minimumFractionDigits: 0 }).format(product.total_revenue || 0)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-500">Загрузка статистики...</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDownloadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">

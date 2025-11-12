@@ -2,17 +2,23 @@ import { useEffect, useState } from 'react'
 import { adminApi } from '../../shared/api'
 import type { Product } from '../../shared/types'
 import { formatPrice, formatProductCount } from '../../shared/utils/formatters'
-import { Loader2, Edit, Save, X } from 'lucide-react'
+import { Loader2, Edit, Save, X, Search } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { useDebounce } from '../../shared/hooks/useDebounce'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
+  const [allProducts, setAllProducts] = useState<Product[]>([])  // Все товары без фильтрации
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingMarkupId, setEditingMarkupId] = useState<number | null>(null)  // ID товара, у которого редактируется надбавка
   const [editForm, setEditForm] = useState<Partial<Product>>({})
   const [markupValue, setMarkupValue] = useState<string>('')  // Значение надбавки при редактировании
   const { token, init } = useAuthStore()
+  
+  // Debounce поискового запроса
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
   // Убеждаемся, что токен инициализирован
   useEffect(() => {
@@ -50,21 +56,29 @@ export default function AdminProducts() {
       if (data.length > 0) {
         console.log('Первые товары:', data.slice(0, 3).map(p => p.name))
       }
+      setAllProducts(data)
       setProducts(data)
     } catch (err: any) {
       console.error('Ошибка загрузки товаров:', err)
       console.error('Статус ответа:', err.response?.status)
       console.error('Детали ошибки:', err.response?.data)
       
+      // Ошибка 401 обрабатывается в axios interceptor, не показываем alert
       if (err.response?.status === 401) {
-        alert('Сессия истекла. Пожалуйста, войдите заново.')
-        // Очищаем localStorage и перенаправляем на логин
-        localStorage.removeItem('auth-storage')
-        window.location.href = '/login'
+        // axios interceptor уже перенаправит на логин
+        return
       } else {
         const errorMessage = err.response?.data?.detail || err.message || 'Неизвестная ошибка'
+        // Убираем технические детали из сообщения для пользователя
+        let userMessage = errorMessage
+        if (errorMessage.includes('401') || errorMessage.includes('учетные данные')) {
+          userMessage = 'Сессия истекла. Пожалуйста, войдите заново.'
+          localStorage.removeItem('auth-storage')
+          window.location.href = '/login'
+          return
+        }
         console.error('Полная ошибка:', errorMessage)
-        alert('Ошибка загрузки товаров: ' + errorMessage)
+        alert('Ошибка загрузки товаров: ' + userMessage)
       }
     } finally {
       setLoading(false)
@@ -109,6 +123,22 @@ export default function AdminProducts() {
     }
   }
 
+  // Фильтрация товаров по поисковому запросу
+  useEffect(() => {
+    if (!debouncedSearchQuery.trim()) {
+      setProducts(allProducts)
+      return
+    }
+
+    const query = debouncedSearchQuery.toLowerCase()
+    const filtered = allProducts.filter(product => 
+      product.name.toLowerCase().includes(query) ||
+      (product.category && product.category.toLowerCase().includes(query)) ||
+      (product.supplier_name && product.supplier_name.toLowerCase().includes(query))
+    )
+    setProducts(filtered)
+  }, [debouncedSearchQuery, allProducts])
+
 
   if (loading) {
     return (
@@ -133,10 +163,35 @@ export default function AdminProducts() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Товары</h1>
-        <p className="text-sm text-gray-600 mt-2">
-          Всего товаров: <span className="font-semibold text-gray-900">{products.length}</span>
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900">Товары</h1>
+            <p className="text-sm text-gray-600 mt-2">
+              Всего товаров: <span className="font-semibold text-gray-900">
+                {searchQuery ? `${products.length} из ${allProducts.length}` : products.length}
+              </span>
+            </p>
+          </div>
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск товаров..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              />
+              {loading && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Компактное отображение как у клиентов, но с колонкой Поставщик */}

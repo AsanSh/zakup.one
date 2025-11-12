@@ -47,14 +47,15 @@ apiClient.interceptors.response.use(
     // НО исключаем сам endpoint логина, чтобы не создавать цикл
     if (error.response?.status === 401) {
       const requestUrl = error.config?.url || ''
-      const isLoginEndpoint = requestUrl.includes('/auth/login')
+      const isLoginEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')
       
-      // Не обрабатываем 401 для endpoint логина - пусть Login.tsx сам обработает
+      // Не обрабатываем 401 для endpoint логина/регистрации - пусть компоненты сами обработают
       if (!isLoginEndpoint) {
         // Очищаем токен
         localStorage.removeItem('auth-storage')
         // Перенаправляем на страницу входа только если мы не на странице логина
-        if (window.location.pathname !== '/login') {
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          // Не показываем alert здесь - пусть компоненты сами решают, что показывать
           window.location.href = '/login'
         }
       }
