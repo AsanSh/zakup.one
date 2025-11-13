@@ -178,13 +178,19 @@ class PriceListDownloader:
         
         imported_count = 0
         updated_count = 0
+        deactivated_count = 0
         errors = []
+        
+        # Собираем названия товаров из прайс-листа
+        price_list_product_names = set()
         
         for product_data in products_data:
             try:
                 name = product_data.get('name', '').strip()
                 if not name:
                     continue
+                
+                price_list_product_names.add(name.lower())
                 
                 purchase_price = float(product_data.get('price', 0))  # Цена из прайс-листа
                 unit = product_data.get('unit', 'шт')
@@ -205,6 +211,7 @@ class PriceListDownloader:
                     existing_product.price = purchase_price + markup  # Продажная цена
                     existing_product.unit = unit
                     existing_product.category = category
+                    existing_product.is_active = True  # Активируем, если был деактивирован
                     existing_product.updated_at = datetime.utcnow()
                     updated_count += 1
                 else:
@@ -229,6 +236,17 @@ class PriceListDownloader:
                 })
                 logger.error(f"Ошибка импорта товара {product_data.get('name', 'Unknown')}: {e}")
         
+        # Деактивируем товары, которых нет в прайс-листе
+        all_supplier_products = self.db.query(Product).filter(
+            Product.supplier_id == supplier_id
+        ).all()
+        
+        for product in all_supplier_products:
+            if product.name.lower() not in price_list_product_names:
+                if product.is_active:
+                    product.is_active = False
+                    deactivated_count += 1
+        
         try:
             self.db.commit()
         except Exception as e:
@@ -239,6 +257,7 @@ class PriceListDownloader:
                 "error": f"Ошибка сохранения данных: {str(e)}",
                 "imported": imported_count,
                 "updated": updated_count,
+                "deactivated": deactivated_count,
                 "total_processed": len(products_data),
                 "errors": errors
             }
@@ -247,6 +266,7 @@ class PriceListDownloader:
             "success": True,
             "imported": imported_count,
             "updated": updated_count,
+            "deactivated": deactivated_count,
             "total_processed": len(products_data),
             "errors": errors
         }

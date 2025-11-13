@@ -31,8 +31,8 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
-    phone: str
-    company: str
+    phone: Optional[str] = ""
+    company: Optional[str] = ""
     is_verified: bool
     is_admin: bool = False
     
@@ -131,7 +131,15 @@ async def get_current_admin_user(
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Получить информацию о текущем пользователе"""
-    return current_user
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "phone": current_user.phone or "",
+        "company": current_user.company or "",
+        "is_verified": current_user.is_verified,
+        "is_admin": current_user.is_admin
+    }
 
 
 @router.post("/register", response_model=UserResponse)
@@ -172,7 +180,15 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         # Логируем ошибку, но не прерываем регистрацию
         print(f"⚠️  Ошибка отправки email при регистрации: {e}")
     
-    return new_user
+    return {
+        "id": new_user.id,
+        "email": new_user.email,
+        "full_name": new_user.full_name,
+        "phone": new_user.phone or "",
+        "company": new_user.company or "",
+        "is_verified": new_user.is_verified,
+        "is_admin": new_user.is_admin
+    }
 
 
 @router.post("/login", response_model=Token)
@@ -215,8 +231,8 @@ async def login(
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
-            "phone": user.phone,
-            "company": user.company,
+            "phone": user.phone or "",
+            "company": user.company or "",
             "is_verified": user.is_verified,
             "is_admin": user.is_admin
         }

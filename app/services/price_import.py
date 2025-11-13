@@ -61,13 +61,19 @@ class PriceImportService:
             # Импортируем товары
             imported_count = 0
             updated_count = 0
+            deactivated_count = 0
             errors = []
+            
+            # Собираем названия товаров из прайс-листа
+            price_list_product_names = set()
             
             for product_data in products_data:
                 try:
                     name = product_data.get('name', '').strip()
                     if not name:
                         continue
+                    
+                    price_list_product_names.add(name.lower())
                     
                     # Проверяем, существует ли товар с таким названием у этого поставщика
                     existing_product = self.db.query(Product).filter(
@@ -83,11 +89,13 @@ class PriceImportService:
                         # Обновляем существующий товар
                         # Сохраняем надбавку, если она была установлена
                         markup = existing_product.markup or 0.0
+                        old_price = existing_product.purchase_price
                         existing_product.purchase_price = purchase_price
                         existing_product.markup = markup
                         existing_product.price = purchase_price + markup  # Продажная цена
                         existing_product.unit = unit
                         existing_product.category = category
+                        existing_product.is_active = True  # Активируем, если был деактивирован
                         existing_product.updated_at = datetime.utcnow()
                         updated_count += 1
                     else:
@@ -111,12 +119,24 @@ class PriceImportService:
                         "error": str(e)
                     })
             
+            # Деактивируем товары, которых нет в прайс-листе
+            all_supplier_products = self.db.query(Product).filter(
+                Product.supplier_id == supplier_id
+            ).all()
+            
+            for product in all_supplier_products:
+                if product.name.lower() not in price_list_product_names:
+                    if product.is_active:
+                        product.is_active = False
+                        deactivated_count += 1
+            
             self.db.commit()
             
             return {
                 "success": True,
                 "imported": imported_count,
                 "updated": updated_count,
+                "deactivated": deactivated_count,
                 "total_processed": len(products_data),
                 "errors": errors
             }

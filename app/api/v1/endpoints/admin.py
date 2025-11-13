@@ -86,15 +86,44 @@ async def create_supplier(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Создать нового поставщика"""
-    new_supplier = Supplier(
-        name=supplier_data.name,
-        contact_email=supplier_data.contact_email,
-        contact_phone=supplier_data.contact_phone
-    )
-    db.add(new_supplier)
-    db.commit()
-    db.refresh(new_supplier)
-    return new_supplier
+    # Проверяем, существует ли поставщик с таким именем
+    existing_supplier = db.query(Supplier).filter(Supplier.name == supplier_data.name).first()
+    if existing_supplier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Поставщик с таким именем уже существует"
+        )
+    
+    try:
+        new_supplier = Supplier(
+            name=supplier_data.name,
+            contact_email=supplier_data.contact_email,
+            contact_phone=supplier_data.contact_phone
+        )
+        db.add(new_supplier)
+        db.commit()
+        db.refresh(new_supplier)
+        
+        # Возвращаем данные в формате SupplierResponse
+        last_update = db.query(PriceListUpdate).filter(
+            PriceListUpdate.supplier_id == new_supplier.id
+        ).order_by(PriceListUpdate.last_update.desc()).first()
+        
+        return {
+            "id": new_supplier.id,
+            "name": new_supplier.name,
+            "contact_email": new_supplier.contact_email,
+            "contact_phone": new_supplier.contact_phone,
+            "is_active": new_supplier.is_active,
+            "default_header_row": last_update.header_row if last_update else (new_supplier.default_header_row or 7),
+            "default_start_row": last_update.start_row if last_update else (new_supplier.default_start_row or 8),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка создания поставщика: {str(e)}"
+        )
 
 
 @router.post("/import-price-list")
@@ -186,22 +215,32 @@ async def import_price_list(
                 )
         
         # Сохраняем информацию о загруженном файле в PriceListUpdate
+        # Нормализуем путь для сравнения (используем относительный путь)
+        normalized_file_path = str(file_path.relative_to(Path.cwd())) if file_path.is_absolute() else str(file_path)
+        
+        # Ищем существующую запись по имени файла или по полному пути
         price_update = db.query(PriceListUpdate).filter(
-            PriceListUpdate.supplier_id == supplier_id,
-            PriceListUpdate.file_path == str(file_path)
+            PriceListUpdate.supplier_id == supplier_id
+        ).filter(
+            (PriceListUpdate.file_path == str(file_path)) |
+            (PriceListUpdate.file_path == normalized_file_path) |
+            (PriceListUpdate.file_path.like(f"%{file_path.name}%"))
         ).first()
         
         if not price_update:
             price_update = PriceListUpdate(
                 supplier_id=supplier_id,
                 download_url=f"file://{file_path}",  # Используем file:// для локальных файлов
-                file_path=str(file_path),
+                file_path=normalized_file_path,  # Сохраняем нормализованный путь
                 frequency=UpdateFrequency.MANUAL,
                 header_row=header_row,
                 start_row=start_row,
                 is_active=True
             )
             db.add(price_update)
+        else:
+            # Обновляем путь, если он изменился
+            price_update.file_path = normalized_file_path
         
         # Обновляем значения по умолчанию для поставщика
         supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
@@ -218,7 +257,19 @@ async def import_price_list(
         
         # НЕ удаляем файл - оставляем для просмотра и скачивания
         
-        return result
+        return {
+            "success": True,
+            "supplier_name": supplier.name,
+            "supplier_id": supplier_id,
+            "import_date": datetime.utcnow().isoformat(),
+            "imported": result.get('imported', 0),
+            "updated": result.get('updated', 0),
+            "deactivated": result.get('deactivated', 0),
+            "total_processed": result.get('total_processed', 0),
+            "total_products": result.get('imported', 0) + result.get('updated', 0),
+            "errors": result.get('errors', []),
+            "message": "Прайс-лист успешно загружен"
+        }
         
     except Exception as e:
         # Удаляем файл только в случае ошибки
@@ -734,12 +785,20 @@ async def get_dashboard_stats(
         )
     ).count()
     
-    # Общий оборот (сумма всех заявок)
-    # TODO: Добавить поле total_amount в Order или считать из OrderItem
-    total_turnover = 0  # Временное значение
+    # Общий оборот (сумма всех заявок через OrderItem)
+    # Считаем только доставленные заявки для реального оборота
+    total_turnover_result = db.query(func.sum(OrderItem.price * OrderItem.quantity)).join(
+        Order, OrderItem.order_id == Order.id
+    ).filter(Order.status == OrderStatus.DELIVERED).scalar()
+    total_turnover = float(total_turnover_result) if total_turnover_result else 0.0
     
     # Количество товаров в каталоге
     total_products = db.query(Product).filter(Product.is_active == True).count()
+    
+    # Дополнительная статистика
+    total_suppliers = db.query(Supplier).filter(Supplier.is_active == True).count()
+    total_users = db.query(User).filter(User.is_admin == False, User.is_active == True).count()
+    pending_orders = db.query(Order).filter(Order.status == OrderStatus.NEW).count()
     
     # График заявок по дням (последние 7 дней)
     orders_by_day = []
@@ -778,6 +837,9 @@ async def get_dashboard_stats(
         "new_users_this_month": new_users_this_month,
         "total_turnover": total_turnover,
         "total_products": total_products,
+        "total_suppliers": total_suppliers,
+        "total_users": total_users,
+        "pending_orders": pending_orders,
         "orders_by_day": orders_by_day,
         "recent_orders": recent_orders_data
     }
@@ -1059,8 +1121,14 @@ async def get_suppliers_price_lists(
         for file_path in upload_files:
             if safe_supplier_name.lower() in file_path.name.lower():
                 # Проверяем, есть ли уже запись в БД для этого файла
+                # Нормализуем путь для сравнения
+                normalized_path = str(file_path.relative_to(Path.cwd())) if file_path.is_absolute() else str(file_path)
                 existing_update = db.query(PriceListUpdate).filter(
-                    PriceListUpdate.file_path == str(file_path)
+                    (PriceListUpdate.file_path == str(file_path)) |
+                    (PriceListUpdate.file_path == normalized_path) |
+                    (PriceListUpdate.file_path.like(f"%{file_path.name}%"))
+                ).filter(
+                    PriceListUpdate.supplier_id == supplier.id
                 ).first()
                 
                 if not existing_update:

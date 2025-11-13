@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminApi } from '../../shared/api'
-import { Loader2, Upload, FileSpreadsheet, Settings, DollarSign, Users, Calendar, Download, FileDown, Edit, X } from 'lucide-react'
+import { Loader2, Upload, FileSpreadsheet, Settings, DollarSign, Users, Calendar, Download, FileDown, Edit, X, CheckCircle, Package, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
 
 interface Supplier {
   id: number
@@ -73,6 +73,8 @@ export default function AdminPriceLists() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showDownloadModal, setShowDownloadModal] = useState(false)
   const [showSupplierModal, setShowSupplierModal] = useState(false)
+  const [showImportResultModal, setShowImportResultModal] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<PriceListInfo | null>(null)
   const [supplierStats, setSupplierStats] = useState<any>(null)
   const [loadingStats, setLoadingStats] = useState(false)
@@ -176,20 +178,23 @@ export default function AdminPriceLists() {
 
     try {
       setUploading(true)
-      await adminApi.importPriceList(
+      const result = await adminApi.importPriceList(
         uploadForm.file,
         parseInt(uploadForm.supplier_id),
         parseInt(uploadForm.header_row),
         parseInt(uploadForm.start_row)
       )
-      alert('Прайс-лист успешно загружен!')
+      setImportResult(result)
       setShowUploadModal(false)
+      setShowImportResultModal(true)
       setUploadForm({
         supplier_id: '',
         header_row: '7',
         start_row: '8',
         file: null,
       })
+      fetchPriceListsInfo()
+      fetchLastUpdate()
     } catch (err: any) {
       console.error('Ошибка загрузки прайс-листа:', err)
       
@@ -316,7 +321,7 @@ export default function AdminPriceLists() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
-            to="/admin/price-lists/management/updates"
+            to="/admin/management/price-lists"
             className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Calendar className="h-5 w-5 text-primary-600" />
@@ -326,7 +331,7 @@ export default function AdminPriceLists() {
             </div>
           </Link>
           <Link
-            to="/admin/price-lists/management/prices"
+            to="/admin/management/prices"
             className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <DollarSign className="h-5 w-5 text-primary-600" />
@@ -336,7 +341,7 @@ export default function AdminPriceLists() {
             </div>
           </Link>
           <Link
-            to="/admin/price-lists/management/counterparties"
+            to="/admin/counterparties"
             className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Users className="h-5 w-5 text-primary-600" />
@@ -346,7 +351,7 @@ export default function AdminPriceLists() {
             </div>
           </Link>
           <Link
-            to="/admin/price-lists/management/suppliers"
+            to="/admin/counterparties/suppliers"
             className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <FileSpreadsheet className="h-5 w-5 text-primary-600" />
@@ -911,6 +916,120 @@ export default function AdminPriceLists() {
                   Отмена
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно с результатами импорта */}
+      {showImportResultModal && importResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Импорт завершен успешно</h2>
+              </div>
+              <button
+                onClick={() => setShowImportResultModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {/* Информация о поставщике */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Package className="h-5 w-5 text-primary-600" />
+                  <span className="font-semibold text-gray-900">Поставщик:</span>
+                </div>
+                <p className="text-gray-700 text-lg">{importResult.supplier_name}</p>
+              </div>
+
+              {/* Дата загрузки */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Calendar className="h-5 w-5 text-primary-600" />
+                  <span className="font-semibold text-gray-900">Дата загрузки:</span>
+                </div>
+                <p className="text-gray-700">
+                  {new Date(importResult.import_date).toLocaleString('ru-RU', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+
+              {/* Статистика */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Package className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">{importResult.total_processed || 0}</p>
+                  <p className="text-sm text-gray-600 mt-1">Всего товаров в прайс-листе</p>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">{importResult.imported || 0}</p>
+                  <p className="text-sm text-gray-600 mt-1">Добавлено новых</p>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Edit className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-yellow-600">{importResult.updated || 0}</p>
+                  <p className="text-sm text-gray-600 mt-1">Обновлено</p>
+                </div>
+
+                <div className="bg-red-50 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <TrendingDown className="h-5 w-5 text-red-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">{importResult.deactivated || 0}</p>
+                  <p className="text-sm text-gray-600 mt-1">Деактивировано</p>
+                </div>
+              </div>
+
+              {/* Ошибки, если есть */}
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <span className="font-semibold text-red-900">Ошибки при импорте:</span>
+                  </div>
+                  <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                    {importResult.errors.slice(0, 5).map((error: any, index: number) => (
+                      <li key={index}>
+                        {error.product}: {error.error}
+                      </li>
+                    ))}
+                    {importResult.errors.length > 5 && (
+                      <li className="text-gray-600">... и еще {importResult.errors.length - 5} ошибок</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowImportResultModal(false)}
+                className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              >
+                Закрыть
+              </button>
             </div>
           </div>
         </div>

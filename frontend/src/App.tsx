@@ -36,6 +36,11 @@ const AdminPriceManagement = lazy(() => import('./admin/pages/AdminPriceManageme
 const AdminCounterparties = lazy(() => import('./admin/pages/AdminCounterparties'))
 const AdminSuppliersManagement = lazy(() => import('./admin/pages/AdminSuppliersManagement'))
 const AdminUserFinance = lazy(() => import('./admin/pages/AdminUserFinance'))
+const AdminProcurement = lazy(() => import('./admin/pages/AdminProcurement'))
+const AdminDrivers = lazy(() => import('./admin/pages/AdminDrivers'))
+const AdminAccessManagement = lazy(() => import('./admin/pages/AdminAccessManagement'))
+const AdminManagement = lazy(() => import('./admin/pages/AdminManagement'))
+const AdminProductPromotions = lazy(() => import('./admin/pages/AdminProductPromotions'))
 
 /**
  * Защищенный роут - требует аутентификации
@@ -209,32 +214,9 @@ function App() {
               </Suspense>
             } 
           />
+          {/* Контрагенты */}
           <Route 
-            path="price-lists" 
-            element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <AdminPriceLists />
-              </Suspense>
-            } 
-          />
-          <Route 
-            path="price-lists/management/updates" 
-            element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <AdminPriceListUpdates />
-              </Suspense>
-            } 
-          />
-          <Route 
-            path="price-lists/management/prices" 
-            element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <AdminPriceManagement />
-              </Suspense>
-            } 
-          />
-          <Route 
-            path="price-lists/management/counterparties" 
+            path="counterparties" 
             element={
               <Suspense fallback={<LoadingSpinner />}>
                 <AdminCounterparties />
@@ -242,12 +224,92 @@ function App() {
             } 
           />
           <Route 
-            path="price-lists/management/suppliers" 
+            path="counterparties/suppliers" 
             element={
               <Suspense fallback={<LoadingSpinner />}>
                 <AdminSuppliersManagement />
               </Suspense>
             } 
+          />
+          <Route 
+            path="counterparties/procurement" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminProcurement />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="counterparties/drivers" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminDrivers />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="counterparties/access" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminAccessManagement />
+              </Suspense>
+            } 
+          />
+          
+          {/* Управление */}
+          <Route 
+            path="management" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminManagement />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="management/price-lists" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminPriceLists />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="management/prices" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminPriceManagement />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="management/products" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminProductPromotions />
+              </Suspense>
+            } 
+          />
+          
+          {/* Старые пути для обратной совместимости */}
+          <Route 
+            path="price-lists" 
+            element={<Navigate to="/admin/management/price-lists" replace />} 
+          />
+          <Route 
+            path="price-lists/management/updates" 
+            element={<Navigate to="/admin/management/price-lists" replace />} 
+          />
+          <Route 
+            path="price-lists/management/prices" 
+            element={<Navigate to="/admin/management/prices" replace />} 
+          />
+          <Route 
+            path="price-lists/management/suppliers" 
+            element={<Navigate to="/admin/counterparties/suppliers" replace />} 
+          />
+          <Route 
+            path="price-lists/management/counterparties" 
+            element={<Navigate to="/admin/counterparties" replace />} 
           />
         </Route>
       </Routes>

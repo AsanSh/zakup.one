@@ -1,41 +1,34 @@
 import { Link } from 'react-router-dom'
-import { Building2, Users, Truck, Shield, UsersRound } from 'lucide-react'
+import { Calendar, DollarSign, Tag } from 'lucide-react'
 
-export default function AdminCounterparties() {
+export default function AdminManagement() {
   const sections = [
     {
-      title: 'Поставщики',
-      description: 'Управление поставщиками товаров',
-      href: '/admin/counterparties/suppliers',
-      icon: Building2,
+      title: 'Обновление прайс-листов',
+      description: 'Загрузка и обновление прайс-листов поставщиков',
+      href: '/admin/management/price-lists',
+      icon: Calendar,
       color: 'bg-blue-500',
     },
     {
-      title: 'Снабженцы',
-      description: 'Управление снабженцами',
-      href: '/admin/counterparties/procurement',
-      icon: Users,
+      title: 'Управление ценами',
+      description: 'Массовое изменение цен на товары',
+      href: '/admin/management/prices',
+      icon: DollarSign,
       color: 'bg-green-500',
     },
     {
-      title: 'Водители',
-      description: 'Управление водителями',
-      href: '/admin/counterparties/drivers',
-      icon: Truck,
+      title: 'Управление товарами',
+      description: 'Акции, скидки и промо-акции для товаров',
+      href: '/admin/management/products',
+      icon: Tag,
       color: 'bg-orange-500',
-    },
-    {
-      title: 'Управление доступом',
-      description: 'Настройка прав доступа для контрагентов',
-      href: '/admin/counterparties/access',
-      icon: Shield,
-      color: 'bg-purple-500',
     },
   ]
 
   return (
     <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Контрагенты</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Управление</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {sections.map((section) => {
@@ -64,3 +57,4 @@ export default function AdminCounterparties() {
     </div>
   )
 }
+
