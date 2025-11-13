@@ -7,6 +7,11 @@ from sqlalchemy.sql import func
 import enum
 from app.core.database import Base
 
+# Импортируем Driver для type hints (избегаем circular import)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.driver import Driver
+
 
 class DeliveryStatus(str, enum.Enum):
     """Статусы доставки"""
@@ -30,14 +35,26 @@ class DeliveryTracking(Base):
     carrier = Column(String)  # Перевозчик
     status = Column(SQLEnum(DeliveryStatus), default=DeliveryStatus.PENDING, index=True)
     
+    # Водитель
+    driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)  # ID водителя
+    
     # Даты
     shipped_at = Column(DateTime(timezone=True))  # Дата отправки
     estimated_delivery_date = Column(DateTime(timezone=True))  # Ожидаемая дата доставки
     delivered_at = Column(DateTime(timezone=True))  # Дата доставки
     
     # Локация
-    current_location = Column(String)  # Текущее местоположение
+    current_location = Column(String)  # Текущее местоположение (текстовое описание)
     destination = Column(String)  # Пункт назначения
+    
+    # Геолокация водителя
+    driver_latitude = Column(String)  # Широта местоположения водителя
+    driver_longitude = Column(String)  # Долгота местоположения водителя
+    driver_location_updated_at = Column(DateTime(timezone=True))  # Время последнего обновления геолокации
+    
+    # Информация о приемке
+    accepted_by = Column(String)  # Кто принял заказ (имя снабженца)
+    accepted_at = Column(DateTime(timezone=True))  # Дата и время приемки
     
     # Комментарии
     notes = Column(Text)  # Примечания
@@ -48,6 +65,8 @@ class DeliveryTracking(Base):
     
     # Связи
     order = relationship("Order", backref="delivery_tracking")
+    # Используем строковое имя для избежания циклических импортов
+    driver = relationship("Driver", back_populates="deliveries", lazy="select")
     events = relationship("DeliveryEvent", back_populates="tracking", cascade="all, delete-orphan")
 
 

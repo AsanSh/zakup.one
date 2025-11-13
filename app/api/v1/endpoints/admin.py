@@ -16,7 +16,7 @@ from app.services.price_list_downloader import PriceListDownloader
 from app.api.v1.endpoints.auth import get_current_admin_user
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 import os
 import shutil
 from pathlib import Path
@@ -33,9 +33,11 @@ class SupplierCreate(BaseModel):
 class SupplierResponse(BaseModel):
     id: int
     name: str
-    contact_email: Optional[str]
-    contact_phone: Optional[str]
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
     is_active: bool
+    default_header_row: Optional[int] = 7  # Строка заголовка по умолчанию
+    default_start_row: Optional[int] = 8  # Строка начала данных по умолчанию
     
     class Config:
         from_attributes = True
@@ -56,7 +58,25 @@ async def get_suppliers(
 ):
     """Получить список поставщиков"""
     suppliers = db.query(Supplier).all()
-    return suppliers
+    result = []
+    for supplier in suppliers:
+        # Получаем последние использованные значения из price_list_updates
+        last_update = db.query(PriceListUpdate).filter(
+            PriceListUpdate.supplier_id == supplier.id
+        ).order_by(PriceListUpdate.last_update.desc()).first()
+        
+        supplier_data = {
+            "id": supplier.id,
+            "name": supplier.name,
+            "contact_email": supplier.contact_email,
+            "contact_phone": supplier.contact_phone,
+            "is_active": supplier.is_active,
+            # Используем значения из последнего обновления или значения по умолчанию
+            "default_header_row": last_update.header_row if last_update else (supplier.default_header_row or 7),
+            "default_start_row": last_update.start_row if last_update else (supplier.default_start_row or 8),
+        }
+        result.append(supplier_data)
+    return result
 
 
 @router.post("/suppliers", response_model=SupplierResponse)
@@ -119,7 +139,7 @@ async def import_price_list(
                 from app.services.stroydvor_parser import StroydvorParser
                 from app.services.price_list_downloader import PriceListDownloader
                 
-                parser = StroydvorParser(str(file_path))
+                parser = StroydvorParser(str(file_path), header_row=header_row, start_row=start_row)
                 products_data = parser.parse()
                 
                 if not products_data:
@@ -182,6 +202,12 @@ async def import_price_list(
                 is_active=True
             )
             db.add(price_update)
+        
+        # Обновляем значения по умолчанию для поставщика
+        supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+        if supplier:
+            supplier.default_header_row = header_row
+            supplier.default_start_row = start_row
         
         price_update.last_update = datetime.utcnow()
         price_update.last_imported_count = result.get('imported', 0)
@@ -352,11 +378,30 @@ async def update_order_status(
         if status_data.status == "shipped":
             tracking.status = DeliveryStatus.SHIPPED
             tracking.shipped_at = datetime.utcnow()
+            # Создаем событие
+            event = DeliveryEvent(
+                tracking_id=tracking.id,
+                status=DeliveryStatus.SHIPPED,
+                description="Заказ направлен на отправку"
+            )
+            db.add(event)
         elif status_data.status == "in_transit":
             tracking.status = DeliveryStatus.IN_TRANSIT
+            event = DeliveryEvent(
+                tracking_id=tracking.id,
+                status=DeliveryStatus.IN_TRANSIT,
+                description="Заказ в пути"
+            )
+            db.add(event)
         elif status_data.status == "delivered":
             tracking.status = DeliveryStatus.DELIVERED
             tracking.delivered_at = datetime.utcnow()
+            event = DeliveryEvent(
+                tracking_id=tracking.id,
+                status=DeliveryStatus.DELIVERED,
+                description="Заказ доставлен"
+            )
+            db.add(event)
         
         if status_data.estimated_delivery_date:
             tracking.estimated_delivery_date = status_data.estimated_delivery_date
@@ -365,6 +410,58 @@ async def update_order_status(
         return {"success": True, "status": status_data.status}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Неверный статус: {str(e)}")
+
+
+class AcceptOrderRequest(BaseModel):
+    accepted_by: str  # Имя снабженца, который принимает заказ
+
+
+@router.post("/orders/{order_id}/accept")
+async def accept_order(
+    order_id: int,
+    accept_data: AcceptOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Принять заказ снабженцем (устанавливает статус 'доставлено')"""
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    
+    # Обновляем статус заказа
+    order.status = OrderStatus.DELIVERED
+    
+    # Обновляем отслеживание доставки
+    tracking = db.query(DeliveryTracking).filter(DeliveryTracking.order_id == order_id).first()
+    if not tracking:
+        tracking = DeliveryTracking(
+            order_id=order_id,
+            status=DeliveryStatus.DELIVERED
+        )
+        db.add(tracking)
+    
+    tracking.status = DeliveryStatus.DELIVERED
+    tracking.delivered_at = datetime.utcnow()
+    tracking.accepted_by = accept_data.accepted_by
+    tracking.accepted_at = datetime.utcnow()
+    
+    # Создаем событие о приемке
+    event = DeliveryEvent(
+        tracking_id=tracking.id,
+        status=DeliveryStatus.DELIVERED,
+        description=f"Заказ принят снабженцем: {accept_data.accepted_by}",
+        location=order.delivery_address
+    )
+    db.add(event)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Заказ принят и отмечен как доставленный",
+        "accepted_by": accept_data.accepted_by,
+        "accepted_at": tracking.accepted_at.isoformat() if tracking.accepted_at else None
+    }
 
 
 @router.get("/products", response_model=List[dict])
@@ -851,28 +948,42 @@ async def download_and_import_price_list(
             PriceListUpdate.download_url == request.download_url
         ).first()
         
+        # Нормализуем frequency к нижнему регистру
+        frequency_value = request.frequency.lower() if request.frequency else "manual"
+        try:
+            frequency_enum = UpdateFrequency(frequency_value)
+        except ValueError:
+            # Если значение не распознано, используем MANUAL
+            frequency_enum = UpdateFrequency.MANUAL
+        
         if not price_update:
             price_update = PriceListUpdate(
                 supplier_id=request.supplier_id,
                 download_url=request.download_url,
                 file_path=file_path,  # Сохраняем путь к файлу
-                frequency=UpdateFrequency(request.frequency),
+                frequency=frequency_enum,
                 header_row=request.header_row,
                 start_row=request.start_row,
                 is_active=True
             )
             db.add(price_update)
         else:
-            price_update.frequency = UpdateFrequency(request.frequency)
+            price_update.frequency = frequency_enum
             price_update.header_row = request.header_row
             price_update.start_row = request.start_row
             price_update.file_path = file_path  # Обновляем путь к файлу
         
         # Вычисляем следующее обновление
-        if request.frequency != "manual":
+        if frequency_value != "manual":
             price_update.next_update = downloader._calculate_next_update(
-                UpdateFrequency(request.frequency)
+                frequency_enum
             )
+        
+        # Обновляем значения по умолчанию для поставщика
+        supplier = db.query(Supplier).filter(Supplier.id == request.supplier_id).first()
+        if supplier:
+            supplier.default_header_row = request.header_row
+            supplier.default_start_row = request.start_row
         
         price_update.last_update = datetime.utcnow()
         price_update.last_imported_count = result.get('imported', 0)
@@ -907,7 +1018,7 @@ async def get_price_list_updates(
             "supplier_id": update.supplier_id,
             "supplier_name": update.supplier.name if update.supplier else None,
             "download_url": update.download_url,
-            "frequency": update.frequency.value,
+            "frequency": update.frequency.value if hasattr(update.frequency, 'value') else update.frequency,
             "is_active": update.is_active,
             "last_update": update.last_update.isoformat() if update.last_update else None,
             "next_update": update.next_update.isoformat() if update.next_update else None,
@@ -987,7 +1098,7 @@ async def get_suppliers_price_lists(
                     "download_url": update.download_url,
                     "file_path": update.file_path,
                     "file_name": Path(update.file_path).name if update.file_path else None,
-                    "frequency": update.frequency.value if update.frequency else None,
+                    "frequency": update.frequency.value if hasattr(update.frequency, 'value') else (update.frequency if update.frequency else None),
                     "is_active": update.is_active,
                     "last_update": update.last_update.isoformat() if update.last_update else None,
                     "next_update": update.next_update.isoformat() if update.next_update else None,
@@ -1003,7 +1114,7 @@ async def get_suppliers_price_lists(
                 "download_url": last_update.download_url,
                 "file_path": last_update.file_path,
                 "file_name": Path(last_update.file_path).name if last_update.file_path else None,
-                "frequency": last_update.frequency.value if last_update.frequency else None,
+                "frequency": last_update.frequency.value if hasattr(last_update.frequency, 'value') else (last_update.frequency if last_update.frequency else None),
                 "is_active": last_update.is_active,
                 "last_update": last_update.last_update.isoformat() if last_update.last_update else None,
                 "next_update": last_update.next_update.isoformat() if last_update.next_update else None,
@@ -1102,7 +1213,7 @@ async def get_last_price_list_update(
                 "name": supplier.name if supplier else "Неизвестен"
             },
             "download_url": last_update.download_url,
-            "frequency": last_update.frequency.value if last_update.frequency else None,
+            "frequency": last_update.frequency.value if hasattr(last_update.frequency, 'value') else (last_update.frequency if last_update.frequency else None),
             "is_active": last_update.is_active,
             "last_update": last_update.last_update.isoformat() if last_update.last_update else None,
             "next_update": last_update.next_update.isoformat() if last_update.next_update else None,
@@ -1126,7 +1237,12 @@ async def update_price_list_update(
         raise HTTPException(status_code=404, detail="Запись обновления не найдена")
     
     if "frequency" in update_data:
-        price_update.frequency = UpdateFrequency(update_data["frequency"])
+        # Нормализуем frequency к нижнему регистру
+        frequency_value = update_data["frequency"].lower() if update_data["frequency"] else "manual"
+        try:
+            price_update.frequency = UpdateFrequency(frequency_value)
+        except ValueError:
+            price_update.frequency = UpdateFrequency.MANUAL
     
     if "is_active" in update_data:
         price_update.is_active = update_data["is_active"]
@@ -1148,7 +1264,7 @@ async def update_price_list_update(
         "success": True,
         "update": {
             "id": price_update.id,
-            "frequency": price_update.frequency.value,
+            "frequency": price_update.frequency.value if hasattr(price_update.frequency, 'value') else price_update.frequency,
             "is_active": price_update.is_active,
             "next_update": price_update.next_update.isoformat() if price_update.next_update else None
         }
@@ -1169,4 +1285,47 @@ async def run_price_list_update(
         raise HTTPException(status_code=500, detail=result.get("error", "Ошибка обновления"))
     
     return result
+
+
+@router.post("/fix-frequency-constraint")
+async def fix_frequency_constraint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Исправить constraint для колонки frequency в таблице price_list_updates"""
+    try:
+        # Удаляем constraint, если он существует
+        db.execute(text("ALTER TABLE price_list_updates DROP CONSTRAINT IF EXISTS price_list_updates_frequency_check;"))
+        
+        # Проверяем текущий тип колонки
+        result = db.execute(text("""
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'price_list_updates' 
+            AND column_name = 'frequency';
+        """))
+        
+        current_type = result.scalar()
+        
+        if current_type and current_type != 'character varying':
+            # Изменяем тип на VARCHAR
+            db.execute(text("""
+                ALTER TABLE price_list_updates 
+                ALTER COLUMN frequency TYPE VARCHAR(20) 
+                USING frequency::text;
+            """))
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Constraint исправлен успешно",
+            "current_type": current_type
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка исправления constraint: {str(e)}"
+        )
 

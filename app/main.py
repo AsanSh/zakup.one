@@ -6,6 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
+# Импортируем все модели для инициализации SQLAlchemy
+from app.models import (
+    User, Product, Supplier, Order, OrderItem,
+    DeliveryTracking, DeliveryEvent, Driver,
+    PriceListUpdate
+)
+
 app = FastAPI(
     title="ZAKUP.ONE API",
     description="Веб-платформа для снабженцев строительных компаний",

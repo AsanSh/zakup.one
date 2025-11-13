@@ -34,5 +34,11 @@ export const clientApi = {
     const response = await apiClient.get(`/orders/${orderId}/tracking`)
     return response.data
   },
+
+  // Активные доставки (со статусом shipped и выше)
+  getActiveDeliveries: async (): Promise<Array<Order & { tracking?: DeliveryTracking; driver_location?: { latitude: number; longitude: number; last_updated: string }; estimated_arrival?: string }>> => {
+    const response = await apiClient.get(`/orders/active-deliveries`)
+    return response.data
+  },
 }
 

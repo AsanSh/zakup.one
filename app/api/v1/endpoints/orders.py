@@ -101,6 +101,88 @@ async def get_order_tracking(
     }
 
 
+@router.get("/active-deliveries")
+async def get_active_deliveries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получить активные доставки (со статусом shipped и выше)"""
+    from app.models.delivery import DeliveryTracking, DeliveryStatus
+    from sqlalchemy import or_
+    
+    # Получаем заказы со статусом shipped, in_transit, out_for_delivery, delivered
+    active_statuses = [
+        OrderStatus.SHIPPED,
+        OrderStatus.IN_TRANSIT,
+        OrderStatus.DELIVERED
+    ]
+    
+    orders = db.query(Order).filter(
+        Order.user_id == current_user.id,
+        Order.status.in_(active_statuses)
+    ).order_by(Order.created_at.desc()).all()
+    
+    result = []
+    for order in orders:
+        tracking = db.query(DeliveryTracking).filter(
+            DeliveryTracking.order_id == order.id
+        ).first()
+        
+        order_data = {
+            "id": order.id,
+            "status": order.status.value,
+            "delivery_address": order.delivery_address,
+            "delivery_comment": order.delivery_comment,
+            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
+            "contact_person": order.contact_person,
+            "contact_phone": order.contact_phone,
+            "tracking_number": order.tracking_number,
+            "estimated_delivery_date": order.estimated_delivery_date.isoformat() if order.estimated_delivery_date else None,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+        }
+        
+        if tracking:
+            # Получаем события
+            events = db.query(DeliveryEvent).filter(
+                DeliveryEvent.tracking_id == tracking.id
+            ).order_by(DeliveryEvent.occurred_at.desc()).all()
+            
+            order_data["tracking"] = {
+                "id": tracking.id,
+                "order_id": tracking.order_id,
+                "status": tracking.status.value,
+                "tracking_number": tracking.tracking_number,
+                "carrier": tracking.carrier,
+                "current_location": tracking.current_location,
+                "destination": tracking.destination,
+                "estimated_delivery_date": tracking.estimated_delivery_date.isoformat() if tracking.estimated_delivery_date else None,
+                "shipped_at": tracking.shipped_at.isoformat() if tracking.shipped_at else None,
+                "delivered_at": tracking.delivered_at.isoformat() if tracking.delivered_at else None,
+                "events": [
+                    {
+                        "id": event.id,
+                        "status": event.status.value,
+                        "location": event.location,
+                        "description": event.description,
+                        "occurred_at": event.occurred_at.isoformat() if event.occurred_at else None
+                    }
+                    for event in events
+                ]
+            }
+            
+            # Добавляем геолокацию водителя, если есть
+            if tracking.driver_latitude and tracking.driver_longitude:
+                order_data["driver_location"] = {
+                    "latitude": float(tracking.driver_latitude),
+                    "longitude": float(tracking.driver_longitude),
+                    "last_updated": tracking.driver_location_updated_at.isoformat() if tracking.driver_location_updated_at else None
+                }
+        
+        result.append(order_data)
+    
+    return result
+
+
 @router.post("/", response_model=OrderResponse)
 async def create_order(
     order_data: OrderCreate,

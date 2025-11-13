@@ -4,7 +4,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useCartStore } from '../../store/cartStore'
-import { ShoppingCart, Search, FileText, LogOut, User, LayoutDashboard } from 'lucide-react'
+import { ShoppingCart, Search, FileText, LogOut, User, LayoutDashboard, MapPin } from 'lucide-react'
 
 export default function ClientLayout() {
   const location = useLocation()
@@ -16,6 +16,7 @@ export default function ClientLayout() {
     { name: 'Товары', href: '/search', icon: Search },
     { name: 'Сборка заявки', href: '/cart', icon: ShoppingCart, badge: cartItemCount },
     { name: 'Мои заявки', href: '/orders', icon: FileText },
+    { name: 'Статус', href: '/delivery-status', icon: MapPin },
   ]
 
   return (

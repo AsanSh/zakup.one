@@ -50,12 +50,12 @@ class PriceImportService:
             # Определяем, какой парсер использовать
             # Если поставщик - Стройдвор, используем специальный парсер
             if 'стройдвор' in supplier.name.lower():
-                parser = StroydvorParser(file_path)
+                parser = StroydvorParser(file_path, header_row=header_row, start_row=start_row)
                 products_data = parser.parse()
             else:
                 # Для других поставщиков используем базовый парсер (если будет создан)
                 # Пока используем StroydvorParser как универсальный
-                parser = StroydvorParser(file_path)
+                parser = StroydvorParser(file_path, header_row=header_row, start_row=start_row)
                 products_data = parser.parse()
             
             # Импортируем товары

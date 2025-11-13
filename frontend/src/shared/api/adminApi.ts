@@ -341,5 +341,15 @@ export const adminApi = {
     const response = await apiClient.get(`/admin/suppliers/${supplierId}/stats`)
     return response.data
   },
+
+  // Исправить constraint для frequency
+  fixFrequencyConstraint: async (): Promise<{
+    success: boolean
+    message: string
+    current_type?: string
+  }> => {
+    const response = await apiClient.post(`/admin/fix-frequency-constraint`)
+    return response.data
+  },
 }
 

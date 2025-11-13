@@ -21,10 +21,12 @@ import re
 class StroydvorParser:
     """Парсер прайс-листа Стройдвор"""
     
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, header_row: Optional[int] = None, start_row: Optional[int] = None):
         self.file_path = file_path
         self.products = []
         self.categories = []
+        self.header_row = header_row  # Номер строки с заголовками (0-based)
+        self.start_row = start_row  # Номер строки начала данных (0-based)
     
     def parse(self) -> List[Dict]:
         """
@@ -45,23 +47,42 @@ class StroydvorParser:
             
             products = []
             current_category = None
-            header_row = None
+            header_row = self.header_row
+            start_row = self.start_row
             
-            # Ищем строку с заголовками (обычно строка 8, индекс 8)
-            for idx in range(min(15, len(df))):
-                row_text = ' '.join([
-                    str(val).lower() if pd.notna(val) else '' 
-                    for val in df.iloc[idx].values
-                ])
-                if 'товар' in row_text and ('ед' in row_text or 'изм' in row_text) and 'цена' in row_text:
-                    header_row = idx
-                    break
-            
+            # Если header_row не указан, ищем строку с заголовками
             if header_row is None:
-                header_row = 8  # По умолчанию
+                for idx in range(min(15, len(df))):
+                    row_text = ' '.join([
+                        str(val).lower() if pd.notna(val) else '' 
+                        for val in df.iloc[idx].values
+                    ])
+                    if 'товар' in row_text and ('ед' in row_text or 'изм' in row_text) and 'цена' in row_text:
+                        header_row = idx
+                        break
+                
+                if header_row is None:
+                    header_row = 7  # По умолчанию (строка 8 в Excel = индекс 7)
             
-            # Проходим по всем строкам начиная с заголовков
-            for idx in range(header_row + 1, len(df)):
+            # Преобразуем из 1-based (как в Excel) в 0-based (как в pandas)
+            # header_row и start_row приходят как 1-based (строка 7 в Excel = индекс 6 в pandas)
+            if header_row is not None:
+                # Если значение больше 0, значит это 1-based индекс (Excel), преобразуем в 0-based
+                if header_row > 0:
+                    header_row = header_row - 1
+            else:
+                # Если не указан, используем найденное значение или по умолчанию
+                pass  # header_row уже установлен выше
+            
+            # Если start_row не указан, используем header_row + 1
+            if start_row is None:
+                start_row = header_row + 1
+            elif start_row > 0:
+                # Преобразуем из 1-based в 0-based
+                start_row = start_row - 1
+            
+            # Проходим по всем строкам начиная с start_row
+            for idx in range(start_row, len(df)):
                 row = df.iloc[idx]
                 
                 # Получаем значения колонок

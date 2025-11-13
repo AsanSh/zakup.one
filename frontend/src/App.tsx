@@ -22,6 +22,7 @@ const Catalog = lazy(() => import('./client/pages/Catalog'))
 const Cart = lazy(() => import('./client/pages/Cart'))
 const OrderHistory = lazy(() => import('./client/pages/OrderHistory'))
 const OrderCreate = lazy(() => import('./client/pages/OrderCreate'))
+const DeliveryStatus = lazy(() => import('./client/pages/DeliveryStatus'))
 const Profile = lazy(() => import('./client/pages/Profile'))
 
 // Admin pages - lazy loading для оптимизации
@@ -138,6 +139,14 @@ function App() {
             element={
               <Suspense fallback={<LoadingSpinner />}>
                 <OrderCreate />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="delivery-status" 
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <DeliveryStatus />
               </Suspense>
             } 
           />

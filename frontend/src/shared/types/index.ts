@@ -39,6 +39,8 @@ export interface Supplier {
   contact_phone?: string
   is_active: boolean
   created_at?: string
+  default_header_row?: number  // Строка заголовка по умолчанию
+  default_start_row?: number  // Строка начала данных по умолчанию
 }
 
 // Статусы заявки

@@ -30,7 +30,8 @@ class PriceListUpdate(Base):
     file_path = Column(String, nullable=True)  # Путь к сохраненному файлу
     
     # Частота обновления
-    frequency = Column(SQLEnum(UpdateFrequency), default=UpdateFrequency.MANUAL, nullable=False)
+    # Используем native_enum=False для PostgreSQL, чтобы избежать проблем с регистром
+    frequency = Column(SQLEnum(UpdateFrequency, native_enum=False, length=20), default=UpdateFrequency.MANUAL, nullable=False)
     
     # Параметры парсинга
     header_row = Column(Integer, default=7)

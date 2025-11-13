@@ -110,7 +110,7 @@ class PriceListDownloader:
             try:
                 # Используем специальный парсер для Стройдвор
                 if 'stroydvor' in price_update.download_url.lower():
-                    parser = StroydvorParser(file_path)
+                    parser = StroydvorParser(file_path, header_row=price_update.header_row, start_row=price_update.start_row)
                     products_data = parser.parse()
                     
                     # Импортируем через PriceImportService

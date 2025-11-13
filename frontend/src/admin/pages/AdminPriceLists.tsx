@@ -90,11 +90,22 @@ export default function AdminPriceLists() {
     start_row: '8',
   })
 
-  useEffect(() => {
-    fetchSuppliers()
-    fetchPriceListsInfo()
-    fetchLastUpdate()
-  }, [])
+      useEffect(() => {
+        // Автоматически исправляем constraint при загрузке страницы
+        const fixConstraint = async () => {
+          try {
+            await adminApi.fixFrequencyConstraint()
+          } catch (err: any) {
+            // Игнорируем ошибки, если constraint уже исправлен
+            console.log('Constraint уже исправлен или не требуется')
+          }
+        }
+        fixConstraint()
+        
+        fetchSuppliers()
+        fetchPriceListsInfo()
+        fetchLastUpdate()
+      }, [])
 
   const fetchSuppliers = async () => {
     try {
@@ -499,7 +510,16 @@ export default function AdminPriceLists() {
                 </label>
                 <select
                   value={uploadForm.supplier_id}
-                  onChange={(e) => setUploadForm({ ...uploadForm, supplier_id: e.target.value })}
+                  onChange={(e) => {
+                    const selectedSupplier = suppliers.find(s => s.id.toString() === e.target.value)
+                    setUploadForm({
+                      ...uploadForm,
+                      supplier_id: e.target.value,
+                      // Автоматически подставляем сохраненные значения для выбранного поставщика
+                      header_row: selectedSupplier?.default_header_row?.toString() || '7',
+                      start_row: selectedSupplier?.default_start_row?.toString() || '8',
+                    })
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="">Выберите поставщика</option>
@@ -657,7 +677,39 @@ export default function AdminPriceLists() {
 
                   {/* История загрузки прайс-листов */}
                   <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">История загрузки прайс-листов</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">История загрузки прайс-листов</h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setShowSupplierModal(false)
+                            setShowDownloadModal(true)
+                            setDownloadForm({
+                              ...downloadForm,
+                              supplier_id: selectedSupplier.id.toString(),
+                            })
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span>Скачать по URL</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowSupplierModal(false)
+                            setShowUploadModal(true)
+                            setUploadForm({
+                              ...uploadForm,
+                              supplier_id: selectedSupplier.id.toString(),
+                            })
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                        >
+                          <Upload className="h-4 w-4" />
+                          <span>Загрузить файл</span>
+                        </button>
+                      </div>
+                    </div>
                     {selectedSupplier.price_list_updates.length > 0 ? (
                       <div className="space-y-2">
                         {selectedSupplier.price_list_updates.map((update, idx) => (
@@ -746,7 +798,16 @@ export default function AdminPriceLists() {
                 </label>
                 <select
                   value={downloadForm.supplier_id}
-                  onChange={(e) => setDownloadForm({ ...downloadForm, supplier_id: e.target.value })}
+                  onChange={(e) => {
+                    const selectedSupplier = suppliers.find(s => s.id.toString() === e.target.value)
+                    setDownloadForm({
+                      ...downloadForm,
+                      supplier_id: e.target.value,
+                      // Автоматически подставляем сохраненные значения для выбранного поставщика
+                      header_row: selectedSupplier?.default_header_row?.toString() || '7',
+                      start_row: selectedSupplier?.default_start_row?.toString() || '8',
+                    })
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   required
                 >

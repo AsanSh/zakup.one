@@ -16,6 +16,11 @@ class Supplier(Base):
     contact_email = Column(String)
     contact_phone = Column(String)
     is_active = Column(Boolean, default=True)
+    
+    # Параметры парсинга по умолчанию для этого поставщика
+    default_header_row = Column(Integer, default=7)  # Строка заголовка по умолчанию
+    default_start_row = Column(Integer, default=8)  # Строка начала данных по умолчанию
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
