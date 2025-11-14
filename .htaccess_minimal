@@ -1,0 +1,14 @@
+# Минимальный .htaccess - все запросы к FastAPI
+# Используйте если стандартный .htaccess не работает
+
+RewriteEngine On
+
+# Disable directory browsing
+Options -Indexes
+
+# Все запросы к Python FastAPI
+# FastAPI сам обработает /assets/ и SPA routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
