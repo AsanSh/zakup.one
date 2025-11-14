@@ -3,46 +3,15 @@
 # Enable rewrite engine
 RewriteEngine On
 
-# Redirect www to non-www (optional, adjust as needed)
-# RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
-# RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
-
-# Force HTTPS (uncomment when SSL is configured)
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
 # Allow direct access to install.php
 RewriteCond %{REQUEST_URI} ^/install\.php$ [NC]
 RewriteRule ^(.*)$ - [L]
 
-# Static files - serve directly (favicon.ico, robots.txt, etc.)
-RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^(.*)$ - [L]
-
-# Frontend static files from dist/assets - serve directly from filesystem
-RewriteCond %{REQUEST_URI} ^/assets/ [NC]
-RewriteCond %{DOCUMENT_ROOT}/frontend/dist%{REQUEST_URI} -f
-RewriteRule ^(.*)$ /frontend/dist%{REQUEST_URI} [L]
-
-# If assets file not found in filesystem, proxy to Python (FastAPI will handle it)
-RewriteCond %{REQUEST_URI} ^/assets/ [NC]
-RewriteRule ^(.*)$ /wsgi.py/$1 [L]
-
-# API requests - proxy to Python backend
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
-RewriteRule ^(.*)$ /wsgi.py/$1 [L]
-
-# Frontend static files - serve from dist directory
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^/api/
-RewriteRule ^(.*)$ /frontend/dist/index.html [L]
-
-# MIME types for static files
+# MIME types for static files - КРИТИЧЕСКИ ВАЖНО: должно быть ПЕРВЫМ
 <IfModule mod_mime.c>
     AddType text/css .css
     AddType application/javascript .js
+    AddType text/javascript .js
     AddType application/json .json
     AddType image/svg+xml .svg
     AddType image/png .png
@@ -54,6 +23,37 @@ RewriteRule ^(.*)$ /frontend/dist/index.html [L]
     AddType font/ttf .ttf
     AddType font/eot .eot
 </IfModule>
+
+# КРИТИЧЕСКИ ВАЖНО: Правило для /assets/ должно быть ПЕРВЫМ после MIME типов
+# Проверяем что файл существует в файловой системе
+RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist/assets/%1 -f
+RewriteRule ^assets/(.*)$ /frontend/dist/assets/$1 [L]
+
+# Если файл не найден в файловой системе, НЕ проксируем к Python
+# Просто возвращаем 404 (чтобы не попасть в SPA routing)
+RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+RewriteRule ^(.*)$ - [R=404,L]
+
+# Статические файлы с расширениями - обслуживаем напрямую (если не /assets/)
+RewriteCond %{REQUEST_URI} !^/assets/ [NC]
+RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# API requests - proxy to Python backend
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
+# Frontend SPA routing - отдаем index.html для всех остальных путей
+# ВАЖНО: это должно быть ПОСЛЕДНИМ правилом
+# И ВАЖНО: исключаем /assets/ из этого правила!
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/assets/
+RewriteCond %{REQUEST_URI} !^/install\.php
+RewriteRule ^(.*)$ /frontend/dist/index.html [L]
 
 # Security headers
 <IfModule mod_headers.c>
@@ -67,6 +67,3 @@ Options -Indexes
 
 # Set default charset
 AddDefaultCharset UTF-8
-
-
-

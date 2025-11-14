@@ -44,11 +44,17 @@ app.add_middleware(
 )
 
 # Подключение статических файлов для frontend
+# ВАЖНО: Это fallback, если Apache не обработал файлы
+# Apache должен обрабатывать /assets/ ПЕРВЫМ через .htaccess
 if frontend_assets and frontend_assets.exists():
     try:
-        app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="assets")
-    except Exception:
-        pass  # Игнорируем ошибки монтирования статики
+        # html=False предотвращает отдачу index.html для несуществующих файлов
+        app.mount("/assets", StaticFiles(directory=str(frontend_assets), html=False), name="assets")
+    except Exception as e:
+        # Логируем ошибку, но не падаем
+        import sys
+        print(f"Warning: Could not mount /assets: {e}", file=sys.stderr)
+        pass
 
 # Обработка favicon.ico - ВАЖНО: регистрируем ПЕРВЫМ
 @app.get("/favicon.ico")
