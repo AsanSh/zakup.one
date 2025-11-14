@@ -20,6 +20,10 @@ npm install
 npm run build
 ```
 
+**Автоматически после сборки:**
+- ✅ Создается `frontend/dist/` с собранными файлами
+- ✅ Автоматически создается `deploy/frontend/dist/` (копия для деплоя)
+
 **Проверка**: Убедитесь что создалась папка `frontend/dist/` с файлами:
 - `index.html`
 - `assets/` (с JS и CSS файлами)
@@ -35,6 +39,8 @@ python3 verify_frontend.py
 - ✅ Наличие `index.html`
 - ✅ Наличие `assets/` с файлами
 - ✅ Конфигурацию в `app/main.py`
+- ✅ MIME типы файлов
+- ✅ Конфигурацию в `wsgi.py` и `.htaccess`
 
 ### 1.2 Проверка Backend
 
@@ -58,6 +64,9 @@ python -m uvicorn app.main:app --reload
 - ✅ `requirements.txt` - зависимости Python
 - ✅ `.env.production.example` - пример переменных окружения
 - ✅ `frontend/dist/` - собранный frontend
+- ✅ `deploy/frontend/dist/` - автоматически создается после `npm run build`
+
+**ВАЖНО:** После `npm run build` автоматически создается папка `deploy/frontend/dist/` - это готовая копия для деплоя!
 
 ---
 
