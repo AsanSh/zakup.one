@@ -20,10 +20,14 @@ RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(.*)$ - [L]
 
-# Frontend static files from dist/assets
+# Frontend static files from dist/assets - serve directly from filesystem
 RewriteCond %{REQUEST_URI} ^/assets/ [NC]
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^(.*)$ - [L]
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist%{REQUEST_URI} -f
+RewriteRule ^(.*)$ /frontend/dist%{REQUEST_URI} [L]
+
+# If assets file not found in filesystem, proxy to Python (FastAPI will handle it)
+RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
 
 # API requests - proxy to Python backend
 RewriteCond %{REQUEST_URI} ^/api/ [NC]
@@ -34,6 +38,22 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^(.*)$ /frontend/dist/index.html [L]
+
+# MIME types for static files
+<IfModule mod_mime.c>
+    AddType text/css .css
+    AddType application/javascript .js
+    AddType application/json .json
+    AddType image/svg+xml .svg
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType image/gif .gif
+    AddType image/x-icon .ico
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType font/ttf .ttf
+    AddType font/eot .eot
+</IfModule>
 
 # Security headers
 <IfModule mod_headers.c>
