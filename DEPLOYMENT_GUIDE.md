@@ -24,6 +24,18 @@ npm run build
 - `index.html`
 - `assets/` (с JS и CSS файлами)
 
+**ВАЖНО:** После сборки запустите проверку:
+```bash
+cd ..
+python3 verify_frontend.py
+```
+
+Скрипт проверит:
+- ✅ Наличие `frontend/dist/`
+- ✅ Наличие `index.html`
+- ✅ Наличие `assets/` с файлами
+- ✅ Конфигурацию в `app/main.py`
+
 ### 1.2 Проверка Backend
 
 ```bash
