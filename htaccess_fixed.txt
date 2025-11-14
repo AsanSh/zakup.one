@@ -1,0 +1,72 @@
+# Spaceship .htaccess configuration for zakup.one
+# ИСПРАВЛЕННАЯ ВЕРСИЯ - загрузите на сервер!
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Allow direct access to install.php
+RewriteCond %{REQUEST_URI} ^/install\.php$ [NC]
+RewriteRule ^(.*)$ - [L]
+
+# MIME types for static files - КРИТИЧЕСКИ ВАЖНО: должно быть ПЕРВЫМ
+<IfModule mod_mime.c>
+    AddType text/css .css
+    AddType application/javascript .js
+    AddType text/javascript .js
+    AddType application/json .json
+    AddType image/svg+xml .svg
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType image/gif .gif
+    AddType image/x-icon .ico
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType font/ttf .ttf
+    AddType font/eot .eot
+</IfModule>
+
+# КРИТИЧЕСКИ ВАЖНО: Правило для /assets/ должно быть ПЕРВЫМ после MIME типов
+# Проверяем что файл существует в файловой системе
+RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist/assets/%1 -f
+RewriteRule ^assets/(.*)$ /frontend/dist/assets/$1 [L]
+
+# Если файл не найден в файловой системе, НЕ проксируем к Python
+# Просто возвращаем 404 (чтобы не попасть в SPA routing)
+RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+RewriteRule ^(.*)$ - [R=404,L]
+
+# Статические файлы с расширениями - обслуживаем напрямую (если не /assets/)
+RewriteCond %{REQUEST_URI} !^/assets/ [NC]
+RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# API requests - proxy to Python backend
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
+# Frontend SPA routing - отдаем index.html для всех остальных путей
+# ВАЖНО: это должно быть ПОСЛЕДНИМ правилом
+# И ВАЖНО: исключаем /assets/ из этого правила!
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/assets/
+RewriteCond %{REQUEST_URI} !^/install\.php
+RewriteRule ^(.*)$ /frontend/dist/index.html [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Disable directory browsing
+Options -Indexes
+
+# Set default charset
+AddDefaultCharset UTF-8
+
