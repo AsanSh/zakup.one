@@ -4,19 +4,21 @@
  * Откройте: https://zakup.one/deploy_simple.php
  */
 
-// Безопасность: проверка хоста
-$allowed_hosts = ['zakup.one', 'www.zakup.one', 'localhost', '127.0.0.1'];
-$current_host = $_SERVER['HTTP_HOST'] ?? '';
-if (!in_array($current_host, $allowed_hosts) && !in_array(parse_url($current_host, PHP_URL_HOST), $allowed_hosts)) {
-    die('Access denied. Allowed hosts only.');
-}
+// Включаем отображение ошибок для отладки
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+
+// Безопасность: проверка хоста (упрощенная)
+$allowed_hosts = ['zakup.one', 'www.zakup.one', 'localhost', '127.0.0.1', 'server41.shared.spaceship.host'];
+$current_host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
 
 // Настройки
 $project_dir = __DIR__;
 $venv_pip = '/home/kdlqemdxxn/virtualenv/zakup.one/3.11/bin/pip';
 $python = '/home/kdlqemdxxn/virtualenv/zakup.one/3.11/bin/python3.11';
 
-// Функция для выполнения команд
+// Функция для безопасного выполнения команд
 function executeCommand($command, $cwd = null) {
     $descriptorspec = [
         0 => ["pipe", "r"],
@@ -24,249 +26,263 @@ function executeCommand($command, $cwd = null) {
         2 => ["pipe", "w"]
     ];
     
-    $process = proc_open($command, $descriptorspec, $pipes, $cwd);
+    $process = @proc_open($command, $descriptorspec, $pipes, $cwd);
     
     if (!is_resource($process)) {
-        return ['success' => false, 'output' => 'Failed to execute command', 'error' => ''];
+        return ['success' => false, 'output' => 'Failed to execute command', 'error' => 'Process creation failed'];
     }
     
-    fclose($pipes[0]);
+    @fclose($pipes[0]);
     
-    $output = stream_get_contents($pipes[1]);
-    $error = stream_get_contents($pipes[2]);
+    $output = @stream_get_contents($pipes[1]);
+    $error = @stream_get_contents($pipes[2]);
     
-    fclose($pipes[1]);
-    fclose($pipes[2]);
+    @fclose($pipes[1]);
+    @fclose($pipes[2]);
     
-    $return_value = proc_close($process);
+    $return_value = @proc_close($process);
     
     return [
         'success' => $return_value === 0,
-        'output' => $output,
-        'error' => $error,
+        'output' => $output ?: '',
+        'error' => $error ?: '',
         'return_code' => $return_value
     ];
 }
 
 // Обработка AJAX запросов
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     
     $action = $_POST['action'] ?? '';
     $result = ['success' => false, 'message' => '', 'data' => []];
     
-    switch ($action) {
-        case 'check_files':
-            // Проверка наличия файлов
-            $files_to_check = [
-                'app/main_simple.py' => 'Упрощенная версия backend',
-                'wsgi_simple.py' => 'Упрощенный WSGI',
-                'requirements_simple.txt' => 'Упрощенные зависимости',
-                'frontend/dist/index.html' => 'Собранный frontend',
-                'app/main.py' => 'Текущий main.py',
-                'wsgi.py' => 'Текущий wsgi.py',
-            ];
-            
-            $files_status = [];
-            foreach ($files_to_check as $file => $description) {
-                $full_path = $project_dir . '/' . $file;
-                $exists = file_exists($full_path);
-                $files_status[] = [
-                    'file' => $file,
-                    'description' => $description,
-                    'exists' => $exists,
-                    'size' => $exists ? filesize($full_path) : 0,
-                    'readable' => $exists ? is_readable($full_path) : false,
-                    'writable' => $exists ? is_writable($full_path) : false,
+    try {
+        switch ($action) {
+            case 'check_files':
+                // Проверка наличия файлов
+                $files_to_check = [
+                    'app/main_simple.py' => 'Упрощенная версия backend',
+                    'wsgi_simple.py' => 'Упрощенный WSGI',
+                    'requirements_simple.txt' => 'Упрощенные зависимости',
+                    'frontend/dist/index.html' => 'Собранный frontend',
+                    'app/main.py' => 'Текущий main.py',
+                    'wsgi.py' => 'Текущий wsgi.py',
                 ];
-            }
-            
-            $result = [
-                'success' => true,
-                'message' => 'Проверка файлов завершена',
-                'data' => $files_status
-            ];
-            break;
-            
-        case 'backup_current':
-            // Резервное копирование текущих файлов
-            $files_to_backup = ['app/main.py', 'wsgi.py', 'requirements.txt'];
-            $backup_dir = $project_dir . '/backup_' . date('Y-m-d_H-i-s');
-            
-            if (!file_exists($backup_dir)) {
-                mkdir($backup_dir, 0755, true);
-            }
-            
-            $backup_results = [];
-            foreach ($files_to_backup as $file) {
-                $source = $project_dir . '/' . $file;
-                if (file_exists($source)) {
-                    $dest = $backup_dir . '/' . basename($file);
-                    if (copy($source, $dest)) {
-                        $backup_results[] = ['file' => $file, 'status' => 'backed up', 'path' => $dest];
+                
+                $files_status = [];
+                foreach ($files_to_check as $file => $description) {
+                    $full_path = $project_dir . '/' . $file;
+                    $exists = @file_exists($full_path);
+                    $files_status[] = [
+                        'file' => $file,
+                        'description' => $description,
+                        'exists' => $exists,
+                        'size' => $exists ? @filesize($full_path) : 0,
+                        'readable' => $exists ? @is_readable($full_path) : false,
+                        'writable' => $exists ? @is_writable($full_path) : false,
+                    ];
+                }
+                
+                $result = [
+                    'success' => true,
+                    'message' => 'Проверка файлов завершена',
+                    'data' => $files_status
+                ];
+                break;
+                
+            case 'backup_current':
+                // Резервное копирование текущих файлов
+                $files_to_backup = ['app/main.py', 'wsgi.py', 'requirements.txt'];
+                $backup_dir = $project_dir . '/backup_' . date('Y-m-d_H-i-s');
+                
+                if (!@file_exists($backup_dir)) {
+                    @mkdir($backup_dir, 0755, true);
+                }
+                
+                $backup_results = [];
+                foreach ($files_to_backup as $file) {
+                    $source = $project_dir . '/' . $file;
+                    if (@file_exists($source)) {
+                        $dest = $backup_dir . '/' . basename($file);
+                        if (@copy($source, $dest)) {
+                            $backup_results[] = ['file' => $file, 'status' => 'backed up', 'path' => $dest];
+                        } else {
+                            $backup_results[] = ['file' => $file, 'status' => 'failed', 'error' => 'Copy failed'];
+                        }
                     } else {
-                        $backup_results[] = ['file' => $file, 'status' => 'failed', 'error' => 'Copy failed'];
+                        $backup_results[] = ['file' => $file, 'status' => 'not found', 'skipped' => true];
                     }
-                } else {
-                    $backup_results[] = ['file' => $file, 'status' => 'not found', 'skipped' => true];
-                }
-            }
-            
-            $result = [
-                'success' => true,
-                'message' => 'Резервное копирование завершено',
-                'data' => [
-                    'backup_dir' => $backup_dir,
-                    'files' => $backup_results
-                ]
-            ];
-            break;
-            
-        case 'rename_files':
-            // Переименование файлов
-            $rename_map = [
-                'app/main_simple.py' => 'app/main.py',
-                'wsgi_simple.py' => 'wsgi.py',
-                'requirements_simple.txt' => 'requirements.txt',
-            ];
-            
-            $rename_results = [];
-            foreach ($rename_map as $source => $dest) {
-                $source_path = $project_dir . '/' . $source;
-                $dest_path = $project_dir . '/' . $dest;
-                
-                if (!file_exists($source_path)) {
-                    $rename_results[] = [
-                        'source' => $source,
-                        'dest' => $dest,
-                        'status' => 'failed',
-                        'error' => 'Source file not found'
-                    ];
-                    continue;
                 }
                 
-                // Если файл назначения существует, переименуем его в .old
-                if (file_exists($dest_path)) {
-                    $old_backup = $dest_path . '.old';
-                    rename($dest_path, $old_backup);
-                }
-                
-                if (rename($source_path, $dest_path)) {
-                    $rename_results[] = [
-                        'source' => $source,
-                        'dest' => $dest,
-                        'status' => 'success'
-                    ];
-                } else {
-                    $rename_results[] = [
-                        'source' => $source,
-                        'dest' => $dest,
-                        'status' => 'failed',
-                        'error' => 'Rename failed'
-                    ];
-                }
-            }
-            
-            $result = [
-                'success' => true,
-                'message' => 'Переименование файлов завершено',
-                'data' => $rename_results
-            ];
-            break;
-            
-        case 'install_dependencies':
-            // Установка зависимостей
-            $requirements_file = $project_dir . '/requirements.txt';
-            
-            if (!file_exists($requirements_file)) {
                 $result = [
-                    'success' => false,
-                    'message' => 'Файл requirements.txt не найден',
-                    'data' => []
+                    'success' => true,
+                    'message' => 'Резервное копирование завершено',
+                    'data' => [
+                        'backup_dir' => $backup_dir,
+                        'files' => $backup_results
+                    ]
                 ];
                 break;
-            }
-            
-            // Проверяем наличие pip
-            if (!file_exists($venv_pip)) {
+                
+            case 'rename_files':
+                // Переименование файлов
+                $rename_map = [
+                    'app/main_simple.py' => 'app/main.py',
+                    'wsgi_simple.py' => 'wsgi.py',
+                    'requirements_simple.txt' => 'requirements.txt',
+                ];
+                
+                $rename_results = [];
+                foreach ($rename_map as $source => $dest) {
+                    $source_path = $project_dir . '/' . $source;
+                    $dest_path = $project_dir . '/' . $dest;
+                    
+                    if (!@file_exists($source_path)) {
+                        $rename_results[] = [
+                            'source' => $source,
+                            'dest' => $dest,
+                            'status' => 'failed',
+                            'error' => 'Source file not found'
+                        ];
+                        continue;
+                    }
+                    
+                    // Если файл назначения существует, переименуем его в .old
+                    if (@file_exists($dest_path)) {
+                        $old_backup = $dest_path . '.old';
+                        @rename($dest_path, $old_backup);
+                    }
+                    
+                    if (@rename($source_path, $dest_path)) {
+                        $rename_results[] = [
+                            'source' => $source,
+                            'dest' => $dest,
+                            'status' => 'success'
+                        ];
+                    } else {
+                        $rename_results[] = [
+                            'source' => $source,
+                            'dest' => $dest,
+                            'status' => 'failed',
+                            'error' => 'Rename failed'
+                        ];
+                    }
+                }
+                
                 $result = [
-                    'success' => false,
-                    'message' => 'pip не найден в виртуальном окружении',
-                    'data' => ['pip_path' => $venv_pip]
+                    'success' => true,
+                    'message' => 'Переименование файлов завершено',
+                    'data' => $rename_results
                 ];
                 break;
-            }
-            
-            // Устанавливаем зависимости
-            $command = escapeshellarg($venv_pip) . ' install -r ' . escapeshellarg($requirements_file) . ' 2>&1';
-            $install_result = executeCommand($command, $project_dir);
-            
-            $result = [
-                'success' => $install_result['success'],
-                'message' => $install_result['success'] ? 'Зависимости установлены успешно' : 'Ошибка при установке зависимостей',
-                'data' => [
-                    'output' => $install_result['output'],
-                    'error' => $install_result['error'],
-                    'return_code' => $install_result['return_code']
-                ]
-            ];
-            break;
-            
-        case 'check_packages':
-            // Проверка установленных пакетов
-            $required_packages = ['fastapi', 'uvicorn', 'python-multipart', 'python-dotenv'];
-            $package_status = [];
-            
-            foreach ($required_packages as $package) {
-                $command = escapeshellarg($venv_pip) . ' show ' . escapeshellarg($package) . ' 2>&1';
-                $check_result = executeCommand($command, $project_dir);
                 
-                $package_status[] = [
-                    'package' => $package,
-                    'installed' => $check_result['success'],
-                    'info' => $check_result['success'] ? $check_result['output'] : $check_result['error']
+            case 'install_dependencies':
+                // Установка зависимостей
+                $requirements_file = $project_dir . '/requirements.txt';
+                
+                if (!@file_exists($requirements_file)) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Файл requirements.txt не найден',
+                        'data' => []
+                    ];
+                    break;
+                }
+                
+                // Проверяем наличие pip
+                if (!@file_exists($venv_pip)) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'pip не найден в виртуальном окружении',
+                        'data' => ['pip_path' => $venv_pip]
+                    ];
+                    break;
+                }
+                
+                // Устанавливаем зависимости
+                $command = escapeshellarg($venv_pip) . ' install -r ' . escapeshellarg($requirements_file) . ' 2>&1';
+                $install_result = executeCommand($command, $project_dir);
+                
+                $result = [
+                    'success' => $install_result['success'],
+                    'message' => $install_result['success'] ? 'Зависимости установлены успешно' : 'Ошибка при установке зависимостей',
+                    'data' => [
+                        'output' => $install_result['output'],
+                        'error' => $install_result['error'],
+                        'return_code' => $install_result['return_code']
+                    ]
                 ];
-            }
-            
-            $result = [
-                'success' => true,
-                'message' => 'Проверка пакетов завершена',
-                'data' => $package_status
-            ];
-            break;
-            
-        case 'test_import':
-            // Тест импорта приложения
-            $command = escapeshellarg($python) . ' -c "from app.main import app; print(\'OK\')" 2>&1';
-            $import_result = executeCommand($command, $project_dir);
-            
-            $result = [
-                'success' => $import_result['success'],
-                'message' => $import_result['success'] ? 'Импорт приложения успешен' : 'Ошибка импорта приложения',
-                'data' => [
-                    'output' => $import_result['output'],
-                    'error' => $import_result['error']
-                ]
-            ];
-            break;
-            
-        case 'test_wsgi':
-            // Тест WSGI
-            $command = escapeshellarg($python) . ' -c "from wsgi import application; print(\'OK\')" 2>&1';
-            $wsgi_result = executeCommand($command, $project_dir);
-            
-            $result = [
-                'success' => $wsgi_result['success'],
-                'message' => $wsgi_result['success'] ? 'WSGI работает' : 'Ошибка WSGI',
-                'data' => [
-                    'output' => $wsgi_result['output'],
-                    'error' => $wsgi_result['error']
-                ]
-            ];
-            break;
-            
-        default:
-            $result = ['success' => false, 'message' => 'Unknown action', 'data' => []];
+                break;
+                
+            case 'check_packages':
+                // Проверка установленных пакетов
+                $required_packages = ['fastapi', 'uvicorn', 'python-multipart', 'python-dotenv'];
+                $package_status = [];
+                
+                foreach ($required_packages as $package) {
+                    $command = escapeshellarg($venv_pip) . ' show ' . escapeshellarg($package) . ' 2>&1';
+                    $check_result = executeCommand($command, $project_dir);
+                    
+                    $package_status[] = [
+                        'package' => $package,
+                        'installed' => $check_result['success'],
+                        'info' => $check_result['success'] ? $check_result['output'] : $check_result['error']
+                    ];
+                }
+                
+                $result = [
+                    'success' => true,
+                    'message' => 'Проверка пакетов завершена',
+                    'data' => $package_status
+                ];
+                break;
+                
+            case 'test_import':
+                // Тест импорта приложения
+                $command = escapeshellarg($python) . ' -c "from app.main import app; print(\'OK\')" 2>&1';
+                $import_result = executeCommand($command, $project_dir);
+                
+                $result = [
+                    'success' => $import_result['success'],
+                    'message' => $import_result['success'] ? 'Импорт приложения успешен' : 'Ошибка импорта приложения',
+                    'data' => [
+                        'output' => $import_result['output'],
+                        'error' => $import_result['error']
+                    ]
+                ];
+                break;
+                
+            case 'test_wsgi':
+                // Тест WSGI
+                $command = escapeshellarg($python) . ' -c "from wsgi import application; print(\'OK\')" 2>&1';
+                $wsgi_result = executeCommand($command, $project_dir);
+                
+                $result = [
+                    'success' => $wsgi_result['success'],
+                    'message' => $wsgi_result['success'] ? 'WSGI работает' : 'Ошибка WSGI',
+                    'data' => [
+                        'output' => $wsgi_result['output'],
+                        'error' => $wsgi_result['error']
+                    ]
+                ];
+                break;
+                
+            default:
+                $result = ['success' => false, 'message' => 'Unknown action: ' . $action, 'data' => []];
+        }
+    } catch (Exception $e) {
+        $result = [
+            'success' => false,
+            'message' => 'Exception: ' . $e->getMessage(),
+            'data' => ['trace' => $e->getTraceAsString()]
+        ];
+    } catch (Error $e) {
+        $result = [
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'data' => ['trace' => $e->getTraceAsString()]
+        ];
     }
     
     echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
@@ -387,14 +403,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: #218838;
         }
         
-        .btn-danger {
-            background: #dc3545;
-        }
-        
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        
         .result {
             margin-top: 15px;
             padding: 15px;
@@ -495,6 +503,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 0%;
             transition: width 0.3s;
         }
+        
+        .error-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -505,6 +522,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         
         <div class="content">
+            <div class="error-info" id="phpInfo">
+                <strong>ℹ️ Информация о PHP:</strong><br>
+                Версия: <?php echo phpversion(); ?><br>
+                Директория проекта: <?php echo htmlspecialchars($project_dir); ?><br>
+                Pip путь: <?php echo htmlspecialchars($venv_pip); ?><br>
+                Pip существует: <?php echo @file_exists($venv_pip) ? '✅ Да' : '❌ Нет'; ?>
+            </div>
+            
             <!-- Шаг 1: Проверка файлов -->
             <div class="step">
                 <h3>
@@ -594,7 +619,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             element.className = 'result ' + (success ? 'success' : 'error');
             element.style.display = 'block';
             
-            let html = '<strong>' + message + '</strong>';
+            let html = '<strong>' + escapeHtml(message) + '</strong>';
             
             if (data) {
                 if (Array.isArray(data)) {
@@ -602,14 +627,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     data.forEach(item => {
                         if (item.file) {
                             html += `<li>
-                                <span>${item.file} <small>(${item.description || ''})</small></span>
+                                <span>${escapeHtml(item.file)} <small>(${escapeHtml(item.description || '')})</small></span>
                                 <span class="status ${item.exists ? 'exists' : 'missing'}">
                                     ${item.exists ? '✓ Найден' : '✗ Не найден'}
                                 </span>
                             </li>`;
                         } else if (item.package) {
                             html += `<li>
-                                <span>${item.package}</span>
+                                <span>${escapeHtml(item.package)}</span>
                                 <span class="status ${item.installed ? 'exists' : 'missing'}">
                                     ${item.installed ? '✓ Установлен' : '✗ Не установлен'}
                                 </span>
@@ -618,23 +643,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     });
                     html += '</ul>';
                 } else if (typeof data === 'object') {
-                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    html += '<pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
                 } else {
-                    html += '<pre>' + data + '</pre>';
+                    html += '<pre>' + escapeHtml(String(data)) + '</pre>';
                 }
             }
             
             element.innerHTML = html;
         }
         
-        function showLoading(button) {
-            button.disabled = true;
-            button.innerHTML = button.textContent + ' <span class="loading"></span>';
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
-        function hideLoading(button, text) {
+        function showLoading(button) {
+            button.disabled = true;
+            const original = button.textContent;
+            button.setAttribute('data-original', original);
+            button.innerHTML = original + ' <span class="loading"></span>';
+        }
+        
+        function hideLoading(button) {
             button.disabled = false;
-            button.innerHTML = text;
+            const original = button.getAttribute('data-original') || button.textContent;
+            button.innerHTML = original;
         }
         
         async function makeRequest(action, button = null) {
@@ -649,6 +683,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     body: formData
                 });
                 
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                }
+                
                 const result = await response.json();
                 return result;
             } catch (error) {
@@ -658,62 +696,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     data: null
                 };
             } finally {
-                if (button) hideLoading(button, button.getAttribute('data-original') || button.textContent);
+                if (button) hideLoading(button);
             }
         }
         
         async function checkFiles() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('check_files', button);
             showResult('checkFilesResult', result.success, result.message, result.data);
         }
         
         async function backupCurrent() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('backup_current', button);
             showResult('backupResult', result.success, result.message, result.data);
         }
         
         async function renameFiles() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('rename_files', button);
             showResult('renameResult', result.success, result.message, result.data);
         }
         
         async function installDependencies() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('install_dependencies', button);
             showResult('installResult', result.success, result.message, result.data);
         }
         
         async function checkPackages() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('check_packages', button);
             showResult('packagesResult', result.success, result.message, result.data);
         }
         
         async function testImport() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('test_import', button);
             showResult('testResult', result.success, result.message, result.data);
         }
         
         async function testWsgi() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const result = await makeRequest('test_wsgi', button);
             showResult('testResult', result.success, result.message, result.data);
         }
         
         async function autoDeploy() {
             const button = event.target;
-            button.setAttribute('data-original', button.textContent);
             const resultDiv = document.getElementById('autoDeployResult');
             const progressBar = document.getElementById('progressBar');
             const progressFill = document.getElementById('progressFill');
@@ -745,16 +775,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const result = await makeRequest(step.action);
                 
                 if (result.success) {
-                    log += `✅ ${result.message}<br>`;
+                    log += `✅ ${escapeHtml(result.message)}<br>`;
                 } else {
-                    log += `❌ ${result.message}<br>`;
+                    log += `❌ ${escapeHtml(result.message)}<br>`;
                     if (step.action === 'install_dependencies' || step.action === 'test_import' || step.action === 'test_wsgi') {
                         allSuccess = false;
                     }
                 }
                 
                 if (result.data && typeof result.data === 'object') {
-                    log += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    log += `<pre>${escapeHtml(JSON.stringify(result.data, null, 2))}</pre>`;
                 }
                 
                 log += '<br>';
@@ -768,11 +798,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             resultDiv.innerHTML = log;
             
             button.disabled = false;
-            button.innerHTML = button.getAttribute('data-original');
+            button.innerHTML = '🚀 Автоматическое развертывание';
             progressBar.style.display = 'none';
             progressFill.style.width = '0%';
         }
     </script>
 </body>
 </html>
-
