@@ -33,18 +33,6 @@ frontend_assets = frontend_dist / "assets"
 if frontend_assets.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_assets)), name="static")
 
-# Обработка favicon.ico и других статических файлов
-@app.get("/favicon.ico")
-async def favicon():
-    """Обработка favicon.ico - возвращаем 204 No Content если файл не найден"""
-    from fastapi.responses import Response
-    favicon_path = frontend_dist / "favicon.ico"
-    if favicon_path.exists():
-        from fastapi.responses import FileResponse
-        return FileResponse(str(favicon_path))
-    # Возвращаем пустой ответ вместо ошибки
-    return Response(status_code=204)
-
 # Отдача index.html для всех остальных путей (SPA routing)
 if frontend_dist.exists():
     frontend_index = frontend_dist / "index.html"
@@ -52,14 +40,12 @@ if frontend_dist.exists():
         @app.get("/{full_path:path}")
         async def serve_frontend(full_path: str):
             """Отдает index.html для всех путей, которые не являются API"""
-            # Пропускаем статические файлы и API
-            if (full_path.startswith("api") or 
-                full_path.startswith("static") or
-                full_path.endswith((".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".css", ".js", ".woff", ".woff2", ".ttf", ".eot", ".txt", ".xml", ".json"))):
-                from fastapi import HTTPException
-                raise HTTPException(status_code=404, detail="Not found")
-            from fastapi.responses import FileResponse
-            return FileResponse(str(frontend_index))
+            if not full_path.startswith("api") and not full_path.startswith("static"):
+                from fastapi.responses import FileResponse
+                return FileResponse(str(frontend_index))
+            # Если это API путь, вернем 404
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not found")
 
 # CORS middleware
 app.add_middleware(

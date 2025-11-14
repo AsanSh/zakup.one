@@ -1,0 +1,18 @@
+# Команды для выполнения в SSH терминале на сервере
+
+# 1. Перейдите в директорию проекта
+cd /home/kdlqemdxxn/zakup.one
+
+# 2. Проверьте что файл requirements.txt есть
+ls -la requirements.txt
+
+# 3. Если файл есть, выполните установку:
+source /home/kdlqemdxxn/virtualenv/zakup.one/3.11/bin/activate
+pip install -r requirements.txt
+deactivate
+
+# ИЛИ используйте готовый скрипт:
+# bash install_via_ssh.sh
+
+
+
