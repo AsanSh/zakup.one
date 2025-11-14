@@ -1,9 +1,10 @@
 # Spaceship .htaccess configuration for zakup.one
+# ИСПРАВЛЕННАЯ ВЕРСИЯ - правильное проксирование к FastAPI
 
 # Enable rewrite engine
 RewriteEngine On
 
-# Disable directory browsing - КРИТИЧЕСКИ ВАЖНО!
+# Disable directory browsing
 Options -Indexes
 
 # Allow direct access to install.php
@@ -27,20 +28,26 @@ RewriteRule ^(.*)$ - [L]
     AddType font/eot .eot
 </IfModule>
 
-# Assets - упрощенное правило (без проверки существования файла)
+# КРИТИЧЕСКИ ВАЖНО: Health endpoints и API ПЕРВЫМИ
+# Health check endpoints - проксируем к FastAPI
+RewriteCond %{REQUEST_URI} ^/health$ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
+# Assets - обслуживаем напрямую из файловой системы
 RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist/assets/%1 -f
 RewriteRule ^assets/(.*)$ /frontend/dist/assets/$1 [L]
 
 # Статические файлы с расширениями - обслуживаем напрямую
 RewriteCond %{REQUEST_URI} !^/assets/ [NC]
-RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
 RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteCond %{REQUEST_URI} !^/health [NC]
+RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(.*)$ - [L]
-
-# API requests - proxy to Python backend
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
-RewriteRule ^(.*)$ /wsgi.py/$1 [L]
 
 # Frontend SPA routing - отдаем index.html для всех остальных путей
 # ВАЖНО: это должно быть ПОСЛЕДНИМ правилом
@@ -48,6 +55,7 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !^/api/
 RewriteCond %{REQUEST_URI} !^/assets/
+RewriteCond %{REQUEST_URI} !^/health
 RewriteCond %{REQUEST_URI} !^/install\.php
 RewriteRule ^(.*)$ /frontend/dist/index.html [L]
 
