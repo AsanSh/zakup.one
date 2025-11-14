@@ -28,6 +28,12 @@ RewriteRule ^(.*)$ - [L]
     AddType font/eot .eot
 </IfModule>
 
+# КРИТИЧЕСКИ ВАЖНО: API и Health endpoints ПЕРВЫМИ
+# Все запросы к /api/ и /health должны идти к Python
+RewriteCond %{REQUEST_URI} ^/api/ [NC,OR]
+RewriteCond %{REQUEST_URI} ^/health$ [NC]
+RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+
 # Assets - обслуживаем напрямую из файловой системы
 RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
 RewriteCond %{DOCUMENT_ROOT}/frontend/dist/assets/%1 -f
@@ -41,13 +47,15 @@ RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(.*)$ - [L]
 
-# Все остальные запросы к Python FastAPI
-# LiteSpeed должен обработать это через настройки приложения
+# Frontend SPA routing - отдаем index.html для всех остальных путей
+# ВАЖНО: это должно быть ПОСЛЕДНИМ правилом
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
 RewriteCond %{REQUEST_URI} !^/assets/
-RewriteCond %{REQUEST_URI} !^/frontend/dist/
-RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+RewriteCond %{REQUEST_URI} !^/health
+RewriteCond %{REQUEST_URI} !^/install\.php
+RewriteRule ^(.*)$ /frontend/dist/index.html [L]
 
 # Security headers
 <IfModule mod_headers.c>
