@@ -1,0 +1,61 @@
+/**
+ * API клиент для аутентификации
+ */
+import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+export const authApi = {
+    login: async (email, password) => {
+        try {
+            console.log('Sending login request to:', `${API_URL}/auth/login`);
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+            const response = await axios.post(`${API_URL}/auth/login`, formData, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                withCredentials: true, // Для поддержки cookies если нужно
+            });
+            console.log('Login response:', {
+                status: response.status,
+                hasToken: !!response.data.access_token,
+                user: response.data.user
+            });
+            return response.data;
+        }
+        catch (error) {
+            console.error('Login error:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+            });
+            throw error;
+        }
+    },
+    register: async (data) => {
+        try {
+            console.log('Sending register request to:', `${API_URL}/auth/register`);
+            const response = await axios.post(`${API_URL}/auth/register`, data, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            console.log('Register response:', { status: response.status, user: response.data });
+            return response.data;
+        }
+        catch (error) {
+            console.error('Register error:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+            });
+            throw error;
+        }
+    },
+    getMe: async () => {
+        // Для getMe используем apiClient, так как нужен токен
+        const apiClient = (await import('./axiosConfig')).default;
+        const response = await apiClient.get(`/auth/me`);
+        return response.data;
+    },
+};

@@ -1,21 +1,20 @@
 """
 Главный файл приложения FastAPI
+Упрощенная и улучшенная версия для production
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response
 from pathlib import Path
-from sqlalchemy import text
-from app.core.config import settings
-from app.api.v1.api import api_router
+import os
 
-# Импортируем все модели для инициализации SQLAlchemy
-from app.models import (
-    User, Product, Supplier, Order, OrderItem,
-    DeliveryTracking, DeliveryEvent, Driver,
-    PriceListUpdate
-)
+# Определяем пути
+project_root = Path(__file__).parent.parent
+frontend_dist = project_root / "frontend" / "dist"
+frontend_assets = frontend_dist / "assets" if frontend_dist.exists() else None
 
+# Создаем приложение
 app = FastAPI(
     title="ZAKUP.ONE API",
     description="Веб-платформа для снабженцев строительных компаний",
@@ -24,26 +23,50 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
+# CORS middleware - настраиваем из переменных окружения или используем безопасные значения по умолчанию
+cors_origins = os.getenv("CORS_ORIGINS", "https://www.zakup.one,https://zakup.one,http://www.zakup.one,http://zakup.one")
+# Если это строка со списком, парсим её
+if isinstance(cors_origins, str) and cors_origins.startswith("["):
+    import json
+    try:
+        cors_origins = json.loads(cors_origins)
+    except:
+        cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+elif isinstance(cors_origins, str):
+    cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 # Подключение статических файлов для frontend
-# Путь относительно корня проекта (где находится wsgi.py)
-project_root = Path(__file__).parent.parent
-frontend_dist = project_root / "frontend" / "dist"
-frontend_assets = frontend_dist / "assets"
+if frontend_assets and frontend_assets.exists():
+    app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="assets")
 
-if frontend_assets.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_assets)), name="static")
-
-# Обработка favicon.ico и других статических файлов
+# Обработка favicon.ico
 @app.get("/favicon.ico")
 async def favicon():
     """Обработка favicon.ico - возвращаем 204 No Content если файл не найден"""
-    from fastapi.responses import Response
     favicon_path = frontend_dist / "favicon.ico"
     if favicon_path.exists():
-        from fastapi.responses import FileResponse
         return FileResponse(str(favicon_path))
-    # Возвращаем пустой ответ вместо ошибки
     return Response(status_code=204)
+
+# Подключение API роутеров (с обработкой ошибок)
+try:
+    from app.core.config import settings
+    from app.api.v1.api import api_router
+    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+except Exception as e:
+    # Если не удалось загрузить роутеры, создаем базовые endpoints
+    @app.get("/api/v1/health")
+    async def api_health_fallback():
+        return {"status": "ok", "api": "v1", "note": "Some modules failed to load", "error": str(e)}
 
 # Отдача index.html для всех остальных путей (SPA routing)
 if frontend_dist.exists():
@@ -51,53 +74,54 @@ if frontend_dist.exists():
     if frontend_index.exists():
         @app.get("/{full_path:path}")
         async def serve_frontend(full_path: str):
-            """Отдает index.html для всех путей, которые не являются API"""
-            # Пропускаем статические файлы и API
-            if (full_path.startswith("api") or 
-                full_path.startswith("static") or
-                full_path.endswith((".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".css", ".js", ".woff", ".woff2", ".ttf", ".eot", ".txt", ".xml", ".json"))):
-                from fastapi import HTTPException
-                raise HTTPException(status_code=404, detail="Not found")
-            from fastapi.responses import FileResponse
+            """Отдает index.html для всех путей, которые не являются API или статическими файлами"""
+            # Пропускаем API пути
+            if full_path.startswith("api"):
+                raise HTTPException(status_code=404, detail="API endpoint not found")
+            
+            # Пропускаем статические файлы
+            if full_path.startswith("assets") or full_path.startswith("static"):
+                raise HTTPException(status_code=404, detail="Static file not found")
+            
+            # Пропускаем файлы с расширениями
+            if full_path and "." in full_path.split("/")[-1]:
+                raise HTTPException(status_code=404, detail="File not found")
+            
+            # Отдаем index.html для всех остальных путей
             return FileResponse(str(frontend_index))
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-# Подключение роутеров
-app.include_router(api_router, prefix=settings.API_V1_PREFIX)
-
-
+# Базовые endpoints
 @app.get("/")
 async def root():
+    """Корневой endpoint"""
+    if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+        return FileResponse(str(frontend_dist / "index.html"))
     return {
         "message": "ZAKUP.ONE API",
         "version": "1.0.0",
-        "docs": "/api/docs"
+        "docs": "/api/docs",
+        "frontend": "available" if frontend_dist.exists() else "not found"
     }
-
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint без подключения к БД"""
     try:
-        # Простая проверка без подключения к БД
-        return {"status": "ok", "message": "API is running"}
+        return {
+            "status": "ok",
+            "message": "API is running",
+            "frontend": "available" if (frontend_dist.exists() and (frontend_dist / "index.html").exists()) else "not found"
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.get("/api/v1/health")
 async def api_health_check():
-    """API health check endpoint"""
+    """API health check endpoint с проверкой БД"""
     try:
         from app.core.database import SessionLocal
+        from sqlalchemy import text
+        
         db = SessionLocal()
         try:
             db.execute(text("SELECT 1"))
@@ -106,6 +130,7 @@ async def api_health_check():
             return {"status": "ok", "database": "error", "error": str(db_error)}
         finally:
             db.close()
+    except ImportError:
+        return {"status": "ok", "database": "not configured", "note": "Database module not available"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-

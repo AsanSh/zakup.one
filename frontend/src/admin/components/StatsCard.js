@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export default function StatsCard({ title, value, icon: Icon, iconColor = 'text-primary-600', trend, onClick, }) {
+    return (_jsx("div", { className: `bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow ${onClick ? 'cursor-pointer' : ''}`, onClick: onClick, children: _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("p", { className: "text-sm font-medium text-gray-600", children: title }), _jsx("p", { className: "text-2xl font-bold text-gray-900 mt-2", children: value }), trend && (_jsxs("p", { className: `text-xs mt-1 ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`, children: [trend.isPositive ? '+' : '', trend.value, "% \u0437\u0430 \u043F\u0435\u0440\u0438\u043E\u0434"] }))] }), _jsx("div", { className: `p-3 rounded-full bg-gray-100 ${iconColor}`, children: _jsx(Icon, { className: "h-8 w-8" }) })] }) }));
+}

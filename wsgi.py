@@ -1,12 +1,12 @@
 """
 WSGI entry point for Spaceship hosting
+Улучшенная версия для production
 """
 import os
 import sys
 from pathlib import Path
 
 # Определяем корневую директорию проекта
-# wsgi.py должен быть в корне проекта
 project_root = Path(__file__).parent.absolute()
 
 # Добавляем корневую директорию в Python path
@@ -15,6 +15,16 @@ if str(project_root) not in sys.path:
 
 # Меняем рабочую директорию на корень проекта
 os.chdir(str(project_root))
+
+# Попытка активировать virtualenv (если существует)
+activate_this = '/home/kdlqemdxxn/virtualenv/zakup.one/3.11/bin/activate_this.py'
+if os.path.exists(activate_this):
+    try:
+        with open(activate_this) as f:
+            exec(f.read(), {'__file__': activate_this})
+    except Exception:
+        # Если не удалось активировать, продолжаем без этого
+        pass
 
 # Загружаем переменные окружения из .env файла
 env_file = project_root / '.env'
@@ -30,15 +40,15 @@ if env_file.exists():
 uploads_dir = project_root / 'uploads'
 downloads_dir = project_root / 'downloads'
 for dir_path in [uploads_dir, downloads_dir]:
-    dir_path.mkdir(exist_ok=True)
-    # Устанавливаем права доступа (если возможно)
     try:
+        dir_path.mkdir(exist_ok=True)
+        # Устанавливаем права доступа (если возможно)
         os.chmod(str(dir_path), 0o777)
-    except:
+    except Exception:
         pass
 
+# Импортируем приложение
 try:
-    # Импортируем приложение
     from app.main import app
     application = app
 except Exception as e:
@@ -51,6 +61,7 @@ except Exception as e:
     
     @error_app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        debug_mode = os.getenv("DEBUG", "False").lower() == "true"
         return JSONResponse(
             status_code=500,
             content={
@@ -59,20 +70,20 @@ except Exception as e:
                 "type": type(exc).__name__,
                 "path": str(project_root),
                 "env_exists": env_file.exists(),
-                "traceback": traceback.format_exc() if os.getenv("DEBUG", "False").lower() == "true" else None
+                "traceback": traceback.format_exc() if debug_mode else "Enable DEBUG=true to see traceback"
             }
         )
     
     @error_app.get("/{path:path}")
     async def error_handler(path: str):
+        debug_mode = os.getenv("DEBUG", "False").lower() == "true"
         return {
             "error": "Application initialization failed",
             "message": str(e),
             "type": type(e).__name__,
             "path": str(project_root),
             "env_exists": env_file.exists(),
-            "traceback": traceback.format_exc() if os.getenv("DEBUG", "False").lower() == "true" else None
+            "traceback": traceback.format_exc() if debug_mode else "Enable DEBUG=true to see traceback"
         }
     
     application = error_app
-
