@@ -1,11 +1,11 @@
 """
 Главный файл приложения FastAPI
-Упрощенная и улучшенная версия для production
+Максимально упрощенная версия для надежной работы
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from pathlib import Path
 import os
 
@@ -23,9 +23,8 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
-# CORS middleware - настраиваем из переменных окружения или используем безопасные значения по умолчанию
+# CORS middleware - настраиваем из переменных окружения
 cors_origins = os.getenv("CORS_ORIGINS", "https://www.zakup.one,https://zakup.one,http://www.zakup.one,http://zakup.one")
-# Если это строка со списком, парсим её
 if isinstance(cors_origins, str) and cors_origins.startswith("["):
     import json
     try:
@@ -46,29 +45,32 @@ app.add_middleware(
 
 # Подключение статических файлов для frontend
 if frontend_assets and frontend_assets.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="assets")
+    try:
+        app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="assets")
+    except Exception:
+        pass  # Игнорируем ошибки монтирования статики
 
-# Обработка favicon.ico
+# Обработка favicon.ico - ВАЖНО: регистрируем ПЕРВЫМ
 @app.get("/favicon.ico")
 async def favicon():
-    """Обработка favicon.ico - возвращаем 204 No Content если файл не найден"""
-    favicon_path = frontend_dist / "favicon.ico"
-    if favicon_path.exists():
-        return FileResponse(str(favicon_path))
+    """Обработка favicon.ico"""
+    try:
+        favicon_path = frontend_dist / "favicon.ico"
+        if favicon_path.exists():
+            return FileResponse(str(favicon_path))
+    except Exception:
+        pass
     return Response(status_code=204)
 
-# Базовые endpoints (регистрируем ПЕРЕД catch-all обработчиком)
+# Базовые health endpoints - регистрируем ДО catch-all
 @app.get("/health")
 async def health_check():
     """Health check endpoint без подключения к БД"""
-    try:
-        return {
-            "status": "ok",
-            "message": "API is running",
-            "frontend": "available" if (frontend_dist.exists() and (frontend_dist / "index.html").exists()) else "not found"
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return JSONResponse({
+        "status": "ok",
+        "message": "API is running",
+        "frontend": "available" if (frontend_dist.exists() and (frontend_dist / "index.html").exists()) else "not found"
+    })
 
 @app.get("/api/v1/health")
 async def api_health_check():
@@ -80,15 +82,31 @@ async def api_health_check():
         db = SessionLocal()
         try:
             db.execute(text("SELECT 1"))
-            return {"status": "ok", "database": "connected"}
+            return JSONResponse({"status": "ok", "database": "connected"})
         except Exception as db_error:
-            return {"status": "ok", "database": "error", "error": str(db_error)}
+            return JSONResponse({"status": "ok", "database": "error", "error": str(db_error)})
         finally:
             db.close()
     except ImportError:
-        return {"status": "ok", "database": "not configured", "note": "Database module not available"}
+        return JSONResponse({"status": "ok", "database": "not configured", "note": "Database module not available"})
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return JSONResponse({"status": "error", "message": str(e)})
+
+# Корневой endpoint
+@app.get("/")
+async def root():
+    """Корневой endpoint"""
+    try:
+        if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+            return FileResponse(str(frontend_dist / "index.html"))
+    except Exception:
+        pass
+    return JSONResponse({
+        "message": "ZAKUP.ONE API",
+        "version": "1.0.0",
+        "docs": "/api/docs",
+        "frontend": "available" if frontend_dist.exists() else "not found"
+    })
 
 # Подключение API роутеров (с обработкой ошибок)
 try:
@@ -96,18 +114,24 @@ try:
     from app.api.v1.api import api_router
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 except Exception as e:
-    # Если не удалось загрузить роутеры, базовый health endpoint уже определен выше
-    pass
+    # Если не удалось загрузить роутеры, создаем fallback endpoint
+    @app.get("/api/v1/{path:path}")
+    async def api_fallback(path: str):
+        return JSONResponse({
+            "error": "API modules not loaded",
+            "message": str(e),
+            "note": "Check server logs for details"
+        }, status_code=503)
 
 # Отдача index.html для всех остальных путей (SPA routing)
-# ВАЖНО: Этот обработчик должен быть ПОСЛЕДНИМ, чтобы не перехватывать API запросы
+# ВАЖНО: Этот обработчик должен быть ПОСЛЕДНИМ
 if frontend_dist.exists():
     frontend_index = frontend_dist / "index.html"
     if frontend_index.exists():
         @app.get("/{full_path:path}")
         async def serve_frontend(full_path: str):
             """Отдает index.html для всех путей, которые не являются API или статическими файлами"""
-            # Пропускаем API пути - они должны обрабатываться выше
+            # Пропускаем API пути
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="API endpoint not found")
             
@@ -119,18 +143,8 @@ if frontend_dist.exists():
             if full_path and "." in full_path.split("/")[-1]:
                 raise HTTPException(status_code=404, detail="File not found")
             
-            # Отдаем index.html для всех остальных путей
-            return FileResponse(str(frontend_index))
-
-# Базовые endpoints
-@app.get("/")
-async def root():
-    """Корневой endpoint"""
-    if frontend_dist.exists() and (frontend_dist / "index.html").exists():
-        return FileResponse(str(frontend_dist / "index.html"))
-    return {
-        "message": "ZAKUP.ONE API",
-        "version": "1.0.0",
-        "docs": "/api/docs",
-        "frontend": "available" if frontend_dist.exists() else "not found"
-    }
+            # Отдаем index.html
+            try:
+                return FileResponse(str(frontend_index))
+            except Exception:
+                raise HTTPException(status_code=500, detail="Frontend file not accessible")
