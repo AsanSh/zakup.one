@@ -54,8 +54,59 @@ export default function Login() {
       // Извлекаем понятное сообщение об ошибке
       let errorMessage = 'Ошибка входа. Проверьте данные и попробуйте снова.'
       
+      // Проверяем статус ответа для специфичных ошибок
       if (err.response) {
-        // Сервер вернул ошибку
+        const status = err.response.status
+        
+        // 404 - API недоступен (проблема с проксированием)
+        if (status === 404) {
+          // Проверяем, это HTML (от веб-сервера) или JSON (от FastAPI)
+          const responseData = err.response.data
+          const isHtml404 = typeof responseData === 'string' && responseData.includes('<!DOCTYPE html>')
+          
+          if (isHtml404) {
+            setError('Сервер API недоступен (404). Запрос не доходит до приложения. Проверьте настройки сервера и .htaccess.')
+            return
+          } else {
+            setError('Эндпоинт не найден. Проверьте настройки API.')
+            return
+          }
+        }
+        
+        // 401 - Неверные credentials
+        if (status === 401) {
+          setError('Неверный email или пароль. Проверьте данные и попробуйте снова.')
+          return
+        }
+        
+        // 400 - Bad Request
+        if (status === 400) {
+          setError('Неверный email или пароль. Проверьте формат данных.')
+          return
+        }
+        
+        // 403 - Forbidden (деактивирован или не верифицирован)
+        if (status === 403) {
+          const errorData = err.response.data
+          const detail = typeof errorData === 'string' ? errorData : errorData?.detail || ''
+          
+          if (detail.includes('не верифицирован') || detail.includes('верифицирован')) {
+            setError('Ваш аккаунт еще не верифицирован администратором. Пожалуйста, дождитесь подтверждения.')
+          } else if (detail.includes('деактивирован')) {
+            setError('Ваш аккаунт деактивирован. Обратитесь к администратору.')
+          } else {
+            setError('Доступ запрещен. Обратитесь к администратору.')
+          }
+          return
+        }
+        
+        // 500+ - Ошибка сервера
+        if (status >= 500) {
+          setError('Ошибка сервера. Попробуйте позже или обратитесь к администратору.')
+          return
+        }
+        
+        // Другие ошибки - пытаемся извлечь сообщение
         const errorData = err.response.data
         if (typeof errorData === 'string') {
           errorMessage = errorData
@@ -64,27 +115,28 @@ export default function Login() {
         } else if (errorData?.message) {
           errorMessage = errorData.message
         } else {
-          errorMessage = `Ошибка сервера: ${err.response.status} ${err.response.statusText || ''}`
+          errorMessage = `Ошибка сервера: ${status} ${err.response.statusText || ''}`
         }
+      } else if (err.request) {
+        // Запрос отправлен, но ответа нет (сеть)
+        setError('Не удалось подключиться к серверу. Проверьте подключение к интернету.')
+        return
       } else if (err.message) {
         // Ошибка из authStore или сети
         errorMessage = err.message
+        
+        // Специфичные сообщения
+        if (errorMessage.includes('Network') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('не отвечает')) {
+          setError('Не удалось подключиться к серверу. Проверьте подключение к интернету.')
+          return
+        } else if (errorMessage.includes('Токен не получен')) {
+          setError('Ошибка сервера: токен не получен. Проверьте что API работает и пользователь существует.')
+          return
+        }
       }
       
-      // Показываем понятное сообщение об ошибке
-      if (errorMessage.includes('не верифицирован') || errorMessage.includes('верифицирован')) {
-        setError('Ваш аккаунт еще не верифицирован администратором. Пожалуйста, дождитесь подтверждения.')
-      } else if (errorMessage.includes('деактивирован')) {
-        setError('Ваш аккаунт деактивирован. Обратитесь к администратору.')
-      } else if (errorMessage.includes('Неверный email') || errorMessage.includes('пароль')) {
-        setError('Неверный email или пароль. Проверьте данные и попробуйте снова.')
-      } else if (errorMessage.includes('Network') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('не отвечает')) {
-        setError('Не удалось подключиться к серверу. Проверьте подключение к интернету.')
-      } else if (errorMessage.includes('Токен не получен')) {
-        setError('Ошибка сервера: ' + errorMessage + '. Проверьте что API работает и пользователь существует.')
-      } else {
-        setError(errorMessage)
-      }
+      // Финальное сообщение об ошибке
+      setError(errorMessage)
     } finally {
       // ВСЕГДА снимаем loading, даже при ошибке
       setLoading(false)
