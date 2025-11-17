@@ -22,12 +22,9 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         # Поддержка form-data (как в FastAPI OAuth2PasswordRequestForm)
         if request.content_type == 'application/x-www-form-urlencoded':
-            # Преобразуем form-data в JSON формат
-            data = {
-                'email': request.data.get('username') or request.data.get('email'),
-                'password': request.data.get('password')
-            }
-            request._full_data = data
+            # Преобразуем form-data: username -> email
+            if 'username' in request.data:
+                request.data['email'] = request.data.pop('username')
         
         return super().post(request, *args, **kwargs)
 

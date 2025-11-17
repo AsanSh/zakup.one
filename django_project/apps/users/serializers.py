@@ -34,6 +34,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Кастомный сериализатор для JWT токенов с данными пользователя"""
     
+    username_field = 'email'  # Используем email вместо username
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Заменяем поле username на email
+        self.fields['email'] = self.fields.pop('username')
+    
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -42,6 +49,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
     
     def validate(self, attrs):
+        # Преобразуем email в username для базового валидатора
+        if 'email' in attrs:
+            attrs['username'] = attrs.pop('email')
+        
         data = super().validate(attrs)
         
         # Проверяем что пользователь активен
