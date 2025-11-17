@@ -1,0 +1,23 @@
+# Django и основные зависимости
+Django>=5.0.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+djangorestframework-simplejwt>=5.3.0
+dj-database-url>=2.1.0
+
+# База данных
+psycopg2-binary>=2.9.9
+
+# Утилиты
+python-dotenv>=1.0.0
+pytz>=2023.3
+
+# Excel parsing
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# HTTP requests
+requests>=2.31.0
+
+# File handling
+Pillow>=10.1.0
