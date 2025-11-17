@@ -1,0 +1,50 @@
+========================================
+ENVIRONMENT VARIABLES ДЛЯ SPACESHIP
+========================================
+
+Скопируйте и вставьте в панели Spaceship:
+
+---
+
+1. SECRET_KEY
+Name: SECRET_KEY
+Value: rkAZm1AUIshCABGBzKdlPSJffn3r8BGUpBT-0lQxklk
+
+---
+
+2. DEBUG
+Name: DEBUG
+Value: False
+
+---
+
+3. CORS_ORIGINS
+Name: CORS_ORIGINS
+Value: https://zakup.one,https://www.zakup.one
+
+---
+
+4. UPLOAD_DIR
+Name: UPLOAD_DIR
+Value: ./uploads
+
+---
+
+5. DOWNLOADS_DIR
+Name: DOWNLOADS_DIR
+Value: ./downloads
+
+---
+
+========================================
+ИНСТРУКЦИЯ:
+========================================
+
+1. В панели Spaceship найдите раздел "Environment variables"
+2. Нажмите "ADD VARIABLE"
+3. Скопируйте Name и Value для каждой переменной выше
+4. Нажмите SAVE
+5. Нажмите RESTART приложения
+
+========================================
+
