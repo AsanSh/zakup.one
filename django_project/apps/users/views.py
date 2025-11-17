@@ -108,9 +108,12 @@ def login_simple(request):
         # Создаем токены
         refresh = RefreshToken.for_user(user)
         
+        # Возвращаем в формате совместимом с frontend
         return Response({
-            'access_token': str(refresh.access_token),
-            'refresh_token': str(refresh),
+            'access_token': str(refresh.access_token),  # Для совместимости с frontend
+            'access': str(refresh.access_token),  # Стандартный формат DRF Simple JWT
+            'refresh': str(refresh),  # Стандартный формат DRF Simple JWT
+            'refresh_token': str(refresh),  # Для совместимости с frontend
             'token_type': 'bearer',
             'user': UserSerializer(user).data
         })

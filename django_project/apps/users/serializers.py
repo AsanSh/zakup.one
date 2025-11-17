@@ -84,4 +84,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Добавляем данные пользователя в ответ
         data['user'] = UserSerializer(self.user).data
         
+        # Добавляем access_token для совместимости с frontend (DRF Simple JWT возвращает 'access')
+        if 'access' in data and 'access_token' not in data:
+            data['access_token'] = data['access']
+        
         return data
