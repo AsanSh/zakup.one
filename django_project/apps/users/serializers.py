@@ -51,11 +51,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     
     def validate(self, attrs):
         # Преобразуем email в username для базового валидатора
+        email = attrs.get('email') or attrs.get('username')
+        
+        if not email:
+            raise serializers.ValidationError("Email обязателен")
+        
+        # Преобразуем в username для базового валидатора
+        attrs['username'] = email
         if 'email' in attrs:
-            attrs['username'] = attrs.pop('email')
-        elif 'username' in attrs:
-            # Если пришло username (из form-data), используем его как email
-            attrs['username'] = attrs['username']
+            del attrs['email']
         
         try:
             data = super().validate(attrs)
@@ -64,6 +68,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             error_msg = str(e)
             if 'No active account found' in error_msg or 'Unable to log in' in error_msg:
                 raise serializers.ValidationError("Неверный email или пароль")
+            # Пробрасываем другие ошибки дальше
             raise
         
         # Проверяем что пользователь активен
@@ -78,4 +83,3 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user'] = UserSerializer(self.user).data
         
         return data
-

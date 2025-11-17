@@ -5,7 +5,9 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from .serializers import (
     UserSerializer, 
     UserCreateSerializer, 
@@ -27,6 +29,7 @@ class LoginView(TokenObtainPairView):
                 # Создаем копию QueryDict и изменяем её
                 data = request.data.copy()
                 data['email'] = data.pop('username')
+                # Обновляем request.data
                 request._full_data = data
         
         try:
@@ -34,17 +37,17 @@ class LoginView(TokenObtainPairView):
         except Exception as e:
             # Обработка ошибок с возвратом JSON
             import traceback
-            from rest_framework.response import Response
-            from rest_framework import status
-            
             error_detail = str(e)
+            traceback_str = ""
+            
             if settings.DEBUG:
-                error_detail += f"\n{traceback.format_exc()}"
+                traceback_str = traceback.format_exc()
             
             return Response(
                 {
                     "detail": error_detail,
-                    "type": type(e).__name__
+                    "type": type(e).__name__,
+                    "traceback": traceback_str if settings.DEBUG else None
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -71,4 +74,3 @@ def get_me(request):
     """Получить информацию о текущем пользователе"""
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
-
