@@ -25,13 +25,17 @@ export const useAuthStore = create<AuthState>()((set) => ({
           console.log('🔍 authStore.login: Starting login for', email)
           
           const response: LoginResponse = await authApi.login(email, password)
-          const { access_token, user } = response
           
-          if (!access_token) {
-            throw new Error('Токен не получен от сервера')
+          // Дополнительная проверка (на случай если authApi не проверил)
+          if (!response || !response.access_token) {
+            console.error('❌ Invalid response from authApi:', response)
+            throw new Error('Токен не получен от сервера. Проверьте что API работает и пользователь существует.')
           }
           
+          const { access_token, user } = response
+          
           if (!user) {
+            console.error('❌ User data missing in response:', response)
             throw new Error('Данные пользователя не получены от сервера')
           }
           
@@ -58,6 +62,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
           console.log('✅ authStore.login: State updated')
         } catch (error: any) {
           console.error('❌ authStore.login: Error occurred', error)
+          console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            response: (error as any).response?.data
+          })
           // Пробрасываем ошибку дальше, чтобы Login.tsx мог её обработать
           throw error
         }

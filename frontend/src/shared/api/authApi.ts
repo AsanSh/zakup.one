@@ -38,9 +38,25 @@ export const authApi = {
       
       console.log('Login response:', { 
         status: response.status,
-        hasToken: !!response.data.access_token,
-        user: response.data.user 
+        hasToken: !!response.data?.access_token,
+        hasUser: !!response.data?.user,
+        data: response.data
       })
+      
+      // Проверяем что ответ правильный
+      if (!response.data) {
+        throw new Error('Пустой ответ от сервера')
+      }
+      
+      if (!response.data.access_token) {
+        console.error('Response data:', response.data)
+        throw new Error('Токен не получен от сервера. Ответ: ' + JSON.stringify(response.data))
+      }
+      
+      if (!response.data.user) {
+        console.error('Response data:', response.data)
+        throw new Error('Данные пользователя не получены от сервера. Ответ: ' + JSON.stringify(response.data))
+      }
       
       return response.data
     } catch (error: any) {
@@ -48,8 +64,22 @@ export const authApi = {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
+        headers: error.response?.headers,
       })
-      throw error
+      
+      // Улучшенная обработка ошибок
+      if (error.response) {
+        // Сервер вернул ответ с ошибкой
+        const errorDetail = error.response.data?.detail || error.response.data?.message || 'Ошибка сервера'
+        const errorMessage = typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail)
+        throw new Error(errorMessage)
+      } else if (error.request) {
+        // Запрос отправлен, но ответа нет
+        throw new Error('Сервер не отвечает. Проверьте подключение к интернету.')
+      } else {
+        // Ошибка при настройке запроса
+        throw new Error(error.message || 'Ошибка при отправке запроса')
+      }
     }
   },
 

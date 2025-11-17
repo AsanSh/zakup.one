@@ -44,13 +44,30 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error('❌ Login error:', err)
+      console.error('❌ Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        stack: err.stack
+      })
       
       // Извлекаем понятное сообщение об ошибке
       let errorMessage = 'Ошибка входа. Проверьте данные и попробуйте снова.'
       
-      if (err.response?.data?.detail) {
-        errorMessage = err.response.data.detail
+      if (err.response) {
+        // Сервер вернул ошибку
+        const errorData = err.response.data
+        if (typeof errorData === 'string') {
+          errorMessage = errorData
+        } else if (errorData?.detail) {
+          errorMessage = errorData.detail
+        } else if (errorData?.message) {
+          errorMessage = errorData.message
+        } else {
+          errorMessage = `Ошибка сервера: ${err.response.status} ${err.response.statusText || ''}`
+        }
       } else if (err.message) {
+        // Ошибка из authStore или сети
         errorMessage = err.message
       }
       
@@ -61,8 +78,10 @@ export default function Login() {
         setError('Ваш аккаунт деактивирован. Обратитесь к администратору.')
       } else if (errorMessage.includes('Неверный email') || errorMessage.includes('пароль')) {
         setError('Неверный email или пароль. Проверьте данные и попробуйте снова.')
-      } else if (errorMessage.includes('Network') || errorMessage.includes('ECONNREFUSED')) {
-        setError('Не удалось подключиться к серверу. Проверьте, что backend запущен на порту 8000.')
+      } else if (errorMessage.includes('Network') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('не отвечает')) {
+        setError('Не удалось подключиться к серверу. Проверьте подключение к интернету.')
+      } else if (errorMessage.includes('Токен не получен')) {
+        setError('Ошибка сервера: ' + errorMessage + '. Проверьте что API работает и пользователь существует.')
       } else {
         setError(errorMessage)
       }
