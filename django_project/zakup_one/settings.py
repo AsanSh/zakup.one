@@ -47,8 +47,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'zakup_one.middleware.JSONErrorMiddleware',  # Раскомментируйте если нужно
 ]
+
+# Отключаем CSRF для API (для отладки)
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = ['https://zakup.one', 'http://localhost:8000']
 
 ROOT_URLCONF = 'zakup_one.urls'
 

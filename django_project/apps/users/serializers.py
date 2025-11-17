@@ -50,18 +50,20 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
     
     def validate(self, attrs):
-        # Преобразуем email в username для базового валидатора
+        # Получаем email из attrs
         email = attrs.get('email') or attrs.get('username')
         
         if not email:
             raise serializers.ValidationError("Email обязателен")
         
-        # Преобразуем в username для базового валидатора
+        # Преобразуем в username для базового валидатора Django
         attrs['username'] = email
+        # Удаляем email если есть, чтобы не было конфликта
         if 'email' in attrs:
             del attrs['email']
         
         try:
+            # Вызываем базовый validate который найдет пользователя по username (email)
             data = super().validate(attrs)
         except Exception as e:
             # Преобразуем ошибки в понятный формат
