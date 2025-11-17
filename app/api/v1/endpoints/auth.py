@@ -2,7 +2,7 @@
 API эндпоинты для аутентификации
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.user import User
@@ -13,10 +13,19 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
+
+
+class LoginRequest(BaseModel):
+    """Модель запроса логина (JSON)"""
+    email: str
+    password: str
 
 
 class UserCreate(BaseModel):
@@ -27,7 +36,22 @@ class UserCreate(BaseModel):
     password: str
 
 
+class UserOut(BaseModel):
+    """Модель пользователя для ответа"""
+    id: int
+    email: str
+    full_name: str
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    is_verified: bool
+    is_admin: bool
+    
+    class Config:
+        from_attributes = True
+
+
 class UserResponse(BaseModel):
+    """Алиас для обратной совместимости"""
     id: int
     email: str
     full_name: str
@@ -40,7 +64,15 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class TokenResponse(BaseModel):
+    """Модель ответа с токеном"""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
 class Token(BaseModel):
+    """Алиас для обратной совместимости"""
     access_token: str
     token_type: str
     user: Optional[UserResponse] = None
@@ -191,50 +223,94 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=TokenResponse)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    request: LoginRequest,
     db: Session = Depends(get_db)
 ):
-    """Вход в систему"""
-    user = db.query(User).filter(User.email == form_data.username).first()
+    """
+    Вход в систему
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный email или пароль"
-        )
+    Принимает JSON:
+    {
+        "email": "user@example.com",
+        "password": "string"
+    }
     
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Аккаунт деактивирован"
-        )
-    
-    # Админы могут входить без верификации, обычные пользователи должны быть верифицированы
-    if not user.is_admin and not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Аккаунт не верифицирован администратором"
-        )
-    
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token,
+    Возвращает:
+    {
+        "access_token": "<jwt>",
         "token_type": "bearer",
         "user": {
-            "id": user.id,
-            "email": user.email,
-            "full_name": user.full_name,
-            "phone": user.phone or "",
-            "company": user.company or "",
-            "is_verified": user.is_verified,
-            "is_admin": user.is_admin
+            "id": 1,
+            "email": "user@example.com",
+            "full_name": "...",
+            "is_admin": false
         }
     }
+    """
+    try:
+        # Логируем попытку входа (без пароля)
+        logger.info(f"Login attempt for email: {request.email}")
+        
+        # Находим пользователя по email
+        user = db.query(User).filter(User.email == request.email).first()
+        
+        if user is None:
+            logger.warning(f"Login failed: user not found for email: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный email или пароль"
+            )
+        
+        # Проверяем пароль
+        if not verify_password(request.password, user.hashed_password):
+            logger.warning(f"Login failed: invalid password for email: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный email или пароль"
+            )
+        
+        # Проверяем что пользователь активен
+        if not user.is_active:
+            logger.warning(f"Login failed: inactive account for email: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Аккаунт деактивирован"
+            )
+        
+        # Админы могут входить без верификации, обычные пользователи должны быть верифицированы
+        if not user.is_admin and not user.is_verified:
+            logger.warning(f"Login failed: unverified account for email: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Аккаунт не верифицирован администратором"
+            )
+        
+        # Создаем токен
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email, "user_id": user.id},
+            expires_delta=access_token_expires
+        )
+        
+        logger.info(f"Login successful for email: {request.email}, user_id: {user.id}")
+        
+        # Возвращаем ответ в правильном формате
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserOut.model_validate(user)
+        )
+        
+    except HTTPException:
+        # Пробрасываем HTTP исключения как есть
+        raise
+    except Exception as e:
+        # Логируем неожиданные ошибки
+        logger.error(f"Unexpected error during login for email: {request.email}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Внутренняя ошибка сервера при входе"
+        )
 

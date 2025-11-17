@@ -25,13 +25,13 @@ export const authApi = {
     try {
       console.log('Sending login request to:', `${API_URL}/auth/login`)
       
-      const formData = new URLSearchParams()
-      formData.append('username', email)
-      formData.append('password', password)
-
-      const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, formData, {
+      // Отправляем JSON вместо FormData
+      const response = await axios.post<LoginResponse>(`${API_URL}/auth/login`, {
+        email,
+        password,
+      }, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
         withCredentials: true, // Для поддержки cookies если нужно
       })
