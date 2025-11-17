@@ -42,21 +42,31 @@ try:
     from django.core.wsgi import get_wsgi_application
     application = get_wsgi_application()
 except Exception as e:
-    # Fallback приложение для отладки
-    from django.http import JsonResponse
-    from django.conf import settings
-    from django.core.wsgi import get_wsgi_application
+    # Fallback приложение для отладки с подробными ошибками
+    import traceback
+    import json
     
     def error_application(environ, start_response):
-        response = JsonResponse({
+        debug_mode = os.getenv("DEBUG", "False").lower() == "true"
+        error_info = {
             'error': 'Django application initialization failed',
             'message': str(e),
+            'type': type(e).__name__,
             'django_project': str(django_project),
             'project_root': str(project_root),
-        })
+            'env_exists': env_file.exists() if 'env_file' in locals() else False,
+        }
+        
+        if debug_mode:
+            error_info['traceback'] = traceback.format_exc()
+        
+        response_body = json.dumps(error_info, indent=2, ensure_ascii=False)
         status = '500 Internal Server Error'
-        response_headers = [('Content-Type', 'application/json')]
+        response_headers = [
+            ('Content-Type', 'application/json; charset=utf-8'),
+            ('Content-Length', str(len(response_body.encode('utf-8')))),
+        ]
         start_response(status, response_headers)
-        return [response.content]
+        return [response_body.encode('utf-8')]
     
     application = error_application
