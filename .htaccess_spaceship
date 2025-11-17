@@ -1,0 +1,73 @@
+# Spaceship .htaccess configuration for zakup.one
+# Специальная версия для Spaceship с LiteSpeed + Python
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Disable directory browsing
+Options -Indexes
+
+# Allow direct access to install.php
+RewriteCond %{REQUEST_URI} ^/install\.php$ [NC]
+RewriteRule ^(.*)$ - [L]
+
+# MIME types for static files
+<IfModule mod_mime.c>
+    AddType text/css .css
+    AddType application/javascript .js
+    AddType text/javascript .js
+    AddType application/json .json
+    AddType image/svg+xml .svg
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType image/gif .gif
+    AddType image/x-icon .ico
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType font/ttf .ttf
+    AddType font/eot .eot
+</IfModule>
+
+# КРИТИЧЕСКИ ВАЖНО: API и Health endpoints ПЕРВЫМИ
+# Для Spaceship с Python нужно использовать специальный формат
+# Все запросы к /api/ и /health должны идти к Python приложению
+# Spaceship автоматически обрабатывает wsgi.py, но нужно правильно направить запросы
+
+# Вариант 1: Прямое проксирование к wsgi.py (для Spaceship)
+RewriteCond %{REQUEST_URI} ^/api/ [NC,OR]
+RewriteCond %{REQUEST_URI} ^/health$ [NC]
+RewriteRule ^(.*)$ wsgi.py [E=REQUEST_URI:$1,L,QSA]
+
+# Assets - обслуживаем напрямую из файловой системы
+RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist/assets/%1 -f
+RewriteRule ^assets/(.*)$ /frontend/dist/assets/$1 [L]
+
+# Статические файлы с расширениями - обслуживаем напрямую
+RewriteCond %{REQUEST_URI} !^/assets/ [NC]
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteCond %{REQUEST_URI} !^/health [NC]
+RewriteCond %{REQUEST_URI} \.(ico|txt|xml|json|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# Frontend SPA routing - отдаем index.html для всех остальных путей
+# ВАЖНО: это должно быть ПОСЛЕДНИМ правилом
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/assets/
+RewriteCond %{REQUEST_URI} !^/health
+RewriteCond %{REQUEST_URI} !^/install\.php
+RewriteRule ^(.*)$ /frontend/dist/index.html [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Set default charset
+AddDefaultCharset UTF-8
+
