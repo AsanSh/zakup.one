@@ -47,6 +47,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 'zakup_one.middleware.JSONErrorMiddleware',  # Раскомментируйте если нужно
 ]
 
 ROOT_URLCONF = 'zakup_one.urls'
@@ -54,7 +55,10 @@ ROOT_URLCONF = 'zakup_one.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR.parent.parent / 'frontend' / 'dist',  # Frontend dist для index.html
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

@@ -39,7 +39,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Заменяем поле username на email
-        self.fields['email'] = self.fields.pop('username')
+        if 'username' in self.fields:
+            self.fields['email'] = self.fields.pop('username')
     
     @classmethod
     def get_token(cls, user):
@@ -52,8 +53,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Преобразуем email в username для базового валидатора
         if 'email' in attrs:
             attrs['username'] = attrs.pop('email')
+        elif 'username' in attrs:
+            # Если пришло username (из form-data), используем его как email
+            attrs['username'] = attrs['username']
         
-        data = super().validate(attrs)
+        try:
+            data = super().validate(attrs)
+        except Exception as e:
+            # Преобразуем ошибки в понятный формат
+            error_msg = str(e)
+            if 'No active account found' in error_msg or 'Unable to log in' in error_msg:
+                raise serializers.ValidationError("Неверный email или пароль")
+            raise
         
         # Проверяем что пользователь активен
         if not self.user.is_active:

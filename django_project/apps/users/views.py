@@ -24,9 +24,30 @@ class LoginView(TokenObtainPairView):
         if request.content_type == 'application/x-www-form-urlencoded':
             # Преобразуем form-data: username -> email
             if 'username' in request.data:
-                request.data['email'] = request.data.pop('username')
+                # Создаем копию QueryDict и изменяем её
+                data = request.data.copy()
+                data['email'] = data.pop('username')
+                request._full_data = data
         
-        return super().post(request, *args, **kwargs)
+        try:
+            return super().post(request, *args, **kwargs)
+        except Exception as e:
+            # Обработка ошибок с возвратом JSON
+            import traceback
+            from rest_framework.response import Response
+            from rest_framework import status
+            
+            error_detail = str(e)
+            if settings.DEBUG:
+                error_detail += f"\n{traceback.format_exc()}"
+            
+            return Response(
+                {
+                    "detail": error_detail,
+                    "type": type(e).__name__
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 @api_view(['POST'])
