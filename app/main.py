@@ -137,20 +137,38 @@ if frontend_dist.exists():
         @app.get("/{full_path:path}")
         async def serve_frontend(full_path: str):
             """Отдает index.html для всех путей, которые не являются API или статическими файлами"""
-            # Пропускаем API пути
-            if full_path.startswith("api/"):
-                raise HTTPException(status_code=404, detail="API endpoint not found")
-            
-            # Пропускаем статические файлы
-            if full_path.startswith("assets/") or full_path.startswith("static/"):
-                raise HTTPException(status_code=404, detail="Static file not found")
-            
-            # Пропускаем файлы с расширениями
-            if full_path and "." in full_path.split("/")[-1]:
-                raise HTTPException(status_code=404, detail="File not found")
-            
-            # Отдаем index.html
             try:
-                return FileResponse(str(frontend_index))
-            except Exception:
-                raise HTTPException(status_code=500, detail="Frontend file not accessible")
+                # Пропускаем API пути
+                if full_path.startswith("api/"):
+                    raise HTTPException(status_code=404, detail="API endpoint not found")
+                
+                # Пропускаем статические файлы
+                if full_path.startswith("assets/") or full_path.startswith("static/"):
+                    raise HTTPException(status_code=404, detail="Static file not found")
+                
+                # Пропускаем файлы с расширениями (но не для путей типа /login, /admin и т.д.)
+                if full_path and "." in full_path.split("/")[-1] and "/" not in full_path.split(".")[-1]:
+                    # Это файл с расширением (например .js, .css, .png)
+                    raise HTTPException(status_code=404, detail="Static file not found")
+                
+                # Отдаем index.html для всех SPA маршрутов (login, admin, search и т.д.)
+                if frontend_index.exists():
+                    return FileResponse(
+                        str(frontend_index),
+                        media_type="text/html",
+                        headers={"Cache-Control": "no-cache"}
+                    )
+                else:
+                    raise HTTPException(status_code=500, detail="Frontend index.html not found")
+            except HTTPException:
+                # Пробрасываем HTTP исключения как есть
+                raise
+            except Exception as e:
+                # Логируем ошибку и возвращаем 500 с понятным сообщением
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error serving frontend for path '{full_path}': {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error serving frontend: {str(e)}"
+                )

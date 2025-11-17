@@ -48,21 +48,44 @@ def serve_frontend(request, path=''):
         frontend_dist = project_root / 'frontend' / 'dist'
         index_path = frontend_dist / 'index.html'
         
-        if index_path.exists():
-            with open(index_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            return HttpResponse(content, content_type='text/html')
-        else:
-            # Fallback: попробуем через TemplateView
-            return TemplateView.as_view(template_name='index.html')(request)
+        if not index_path.exists():
+            # Если index.html не найден, возвращаем понятную ошибку
+            if settings.DEBUG:
+                return JsonResponse({
+                    "error": "Frontend not found",
+                    "message": f"index.html not found at {index_path}",
+                    "frontend_dist": str(frontend_dist),
+                    "exists": frontend_dist.exists()
+                }, status=404)
+            else:
+                return HttpResponse("Frontend not found. Please build frontend: cd frontend && npm run build", status=404)
+        
+        # Читаем и отдаем index.html
+        with open(index_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        response = HttpResponse(content, content_type='text/html')
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+        
     except Exception as e:
         import traceback
-        return JsonResponse({
-            "error": "Error serving frontend",
-            "message": str(e),
-            "traceback": traceback.format_exc() if settings.DEBUG else "Enable DEBUG to see traceback",
-            "index_path": str(index_path) if 'index_path' in locals() else "N/A"
-        }, status=500)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error serving frontend for path '{path}': {e}", exc_info=True)
+        
+        if settings.DEBUG:
+            return JsonResponse({
+                "error": "Error serving frontend",
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+                "path": path,
+                "index_path": str(index_path) if 'index_path' in locals() else "N/A"
+            }, status=500)
+        else:
+            return HttpResponse("Internal server error", status=500)
 
 urlpatterns = [
     # Health checks
