@@ -30,9 +30,10 @@ RewriteRule ^(.*)$ - [L]
 
 # КРИТИЧЕСКИ ВАЖНО: API и Health endpoints ПЕРВЫМИ
 # Все запросы к /api/ и /health должны идти к Python
+# Для LiteSpeed нужно использовать формат без ведущего слеша
 RewriteCond %{REQUEST_URI} ^/api/ [NC,OR]
 RewriteCond %{REQUEST_URI} ^/health$ [NC]
-RewriteRule ^(.*)$ /wsgi.py/$1 [L]
+RewriteRule ^(.*)$ wsgi.py/$1 [E=REQUEST_URI:$1,L]
 
 # Assets - обслуживаем напрямую из файловой системы
 RewriteCond %{REQUEST_URI} ^/assets/(.*)$ [NC]
