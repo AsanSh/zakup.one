@@ -41,89 +41,151 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  // Состояние для активных полей ввода количества (productId -> quantity)
-  const [activeInputs, setActiveInputs] = useState<Record<number, number>>({})
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   // Состояние для анимации добавления товара
   const [animatingProduct, setAnimatingProduct] = useState<number | null>(null)
 
   useEffect(() => {
-    loadProducts()
+    loadProducts(1, true)
   }, [])
 
-  const loadProducts = async () => {
+  // Infinite scroll
+  useEffect(() => {
+    if (searchQuery.trim()) return // Не загружаем при поиске
+    
+    const handleScroll = () => {
+      if (loadingMore || !hasMore) return
+      
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+      const windowHeight = window.innerHeight
+      const documentHeight = document.documentElement.scrollHeight
+      
+      // Загружаем следующую страницу, когда пользователь прокрутил на 80% страницы
+      if (scrollTop + windowHeight >= documentHeight * 0.8) {
+        loadMoreProducts()
+      }
+    }
+    
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, hasMore, searchQuery, currentPage])
+
+  const loadProducts = async (page = 1, reset = false) => {
     try {
-      const response = await apiClient.get('/api/catalog/products/')
-      setProducts(response.data.results || response.data || [])
+      if (reset) {
+        setLoading(true)
+        setProducts([])
+        setCurrentPage(1)
+        setHasMore(true)
+      }
+      
+      const response = await apiClient.get(`/api/catalog/products/?page=${page}`)
+      const productsData = response.data.results || response.data || []
+      const nextPage = response.data.next
+      
+      // Сохраняем общее количество товаров
+      if (response.data.count !== undefined) {
+        setTotalCount(response.data.count)
+      }
+      
+      // Сортируем товары по алфавиту
+      const sortedProducts = [...productsData].sort((a, b) => {
+        const nameA = a.name.toLowerCase()
+        const nameB = b.name.toLowerCase()
+        return sortOrder === 'asc' 
+          ? nameA.localeCompare(nameB, 'ru')
+          : nameB.localeCompare(nameA, 'ru')
+      })
+      
+      if (reset) {
+        setProducts(sortedProducts)
+      } else {
+        setProducts(prev => {
+          const combined = [...prev, ...sortedProducts]
+          // Сортируем все товары после добавления
+          return combined.sort((a, b) => {
+            const nameA = a.name.toLowerCase()
+            const nameB = b.name.toLowerCase()
+            return sortOrder === 'asc' 
+              ? nameA.localeCompare(nameB, 'ru')
+              : nameB.localeCompare(nameA, 'ru')
+          })
+        })
+      }
+      
+      setHasMore(!!nextPage)
+      setCurrentPage(page)
     } catch (error) {
       console.error('Ошибка загрузки товаров:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
+  }
+  
+  // Перезагружаем товары при изменении сортировки
+  useEffect(() => {
+    if (products.length > 0) {
+      const sorted = [...products].sort((a, b) => {
+        const nameA = a.name.toLowerCase()
+        const nameB = b.name.toLowerCase()
+        return sortOrder === 'asc' 
+          ? nameA.localeCompare(nameB, 'ru')
+          : nameB.localeCompare(nameA, 'ru')
+      })
+      setProducts(sorted)
+    }
+  }, [sortOrder])
+
+  const loadMoreProducts = async () => {
+    if (loadingMore || !hasMore) return
+    
+    setLoadingMore(true)
+    const nextPage = currentPage + 1
+    await loadProducts(nextPage, false)
   }
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query)
     if (query.trim()) {
       try {
+        setLoading(true)
         const response = await apiClient.get(`/api/catalog/search/?q=${encodeURIComponent(query)}`)
         setProducts(response.data.results || [])
+        setHasMore(false) // При поиске не загружаем больше
       } catch (error) {
         console.error('Ошибка поиска:', error)
+      } finally {
+        setLoading(false)
       }
     } else {
-      loadProducts()
+      loadProducts(1, true)
     }
   }
 
-  const handleAddToCart = (product: Product, quantity: number = 1) => {
-    // Добавляем товар в корзину
-    addItem({
+  const handleAddToCart = (product: Product) => {
+    // Добавляем товар в корзину сразу с количеством 1 (НЕ создаем заявку сразу!)
+    const cartItem = {
       product_id: product.id,
       name: product.name,
       unit: product.unit,
-      quantity: quantity,
+      quantity: 1,
       price: Number(product.final_price),
-    })
+    }
+    
+    addItem(cartItem)
+    console.log('Товар добавлен в корзину:', cartItem)
     
     // Запускаем анимацию
     setAnimatingProduct(product.id)
     setTimeout(() => {
       setAnimatingProduct(null)
     }, 1000)
-    
-    // Закрываем поле ввода
-    setActiveInputs(prev => {
-      const newState = { ...prev }
-      delete newState[product.id]
-      return newState
-    })
-  }
-
-  const handlePlusClick = (product: Product) => {
-    // Активируем поле ввода для этого товара
-    setActiveInputs(prev => ({
-      ...prev,
-      [product.id]: 1
-    }))
-  }
-
-  const handleQuantityChange = (productId: number, delta: number) => {
-    setActiveInputs(prev => {
-      const current = prev[productId] || 1
-      const newQuantity = Math.max(1, current + delta)
-      return {
-        ...prev,
-        [productId]: newQuantity
-      }
-    })
-  }
-
-  const handleQuantityInputChange = (productId: number, value: string) => {
-    const numValue = parseInt(value) || 1
-    setActiveInputs(prev => ({
-      ...prev,
-      [productId]: Math.max(1, numValue)
-    }))
   }
 
   // Группируем товары по категориям
@@ -161,10 +223,31 @@ export default function ProductsPage() {
           </div>
         ) : (
           <>
-            {/* Products Count */}
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              Товары ({products.length})
-            </h2>
+            {/* Products Count and Sort */}
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="text-lg font-bold text-gray-900">
+                Товары ({totalCount > 0 ? totalCount : products.length})
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Сортировка:</span>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1"
+                  title={sortOrder === 'asc' ? 'По убыванию' : 'По возрастанию'}
+                >
+                  <span>А-Я</span>
+                  {sortOrder === 'asc' ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
 
             {/* Products by Category */}
             {groupedProducts.map((group, idx) => (
@@ -172,30 +255,31 @@ export default function ProductsPage() {
                 <h3 className="text-sm font-semibold text-gray-800 mb-3">
                   {group.category} ({group.products.length} товаров)
                 </h3>
-                <div className="bg-white rounded-lg overflow-hidden border border-gray-200 overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed', width: '100%' }}>
-                    <colgroup>
-                      <col style={{ width: '35%' }} />
-                      <col style={{ width: '12%' }} />
-                      <col style={{ width: '18%' }} />
-                      <col style={{ width: '20%' }} />
-                      <col style={{ width: '15%' }} />
-                    </colgroup>
+                <div className="bg-white rounded-lg overflow-hidden border border-gray-200 overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle">
+                    <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed', width: '100%' }}>
+                      <colgroup>
+                        <col className="w-[35%] sm:w-[40%]" />
+                        <col className="w-[10%] sm:w-[12%]" />
+                        <col className="w-[15%] sm:w-[18%]" />
+                        <col className="w-[20%] sm:w-[20%]" />
+                        <col className="w-[20%] sm:w-[10%]" />
+                      </colgroup>
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-2 sm:px-3 py-1 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Название
                         </th>
-                        <th className="px-4 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-1 sm:px-2 py-1 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Единица
                         </th>
-                        <th className="px-4 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-1 sm:px-2 py-1 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Происхождение
                         </th>
-                        <th className="px-4 py-1.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-1 sm:px-2 py-1 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Цена
                         </th>
-                        <th className="px-4 py-1.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-1 sm:px-2 py-1 text-center text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Действие
                         </th>
                       </tr>
@@ -203,93 +287,61 @@ export default function ProductsPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {group.products.map((product) => {
                         const displayUnit = unitMap[product.unit] || product.unit.toLowerCase()
-                        const isActive = activeInputs.hasOwnProperty(product.id)
-                        const quantity = activeInputs[product.id] || 1
                         
                         return (
                           <tr key={product.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-1.5 text-sm font-medium text-gray-900 truncate">
+                            <td className="px-2 sm:px-3 py-1 text-[11px] sm:text-sm font-medium text-gray-900 truncate" title={product.name}>
                               {product.name}
                             </td>
-                            <td className="px-4 py-1.5 text-sm text-gray-500">
+                            <td className="px-1 sm:px-2 py-1 text-[11px] sm:text-sm text-gray-500 whitespace-nowrap">
                               {displayUnit}
                             </td>
-                            <td className="px-4 py-1.5 text-sm text-gray-500">
+                            <td className="px-1 sm:px-2 py-1 text-[11px] sm:text-sm text-gray-500 whitespace-nowrap">
                               {product.origin || 'РФ'}
                             </td>
-                            <td className="px-4 py-1.5 text-sm font-medium text-gray-900">
+                            <td className="px-1 sm:px-2 py-1 text-[11px] sm:text-sm font-medium text-gray-900 whitespace-nowrap">
                               {Number(product.final_price).toLocaleString('ru-RU')} сом
                             </td>
-                            <td className="px-4 py-1.5 text-center">
-                              {isActive ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <button
-                                    onClick={() => handleQuantityChange(product.id, -1)}
-                                    className="inline-flex items-center justify-center w-6 h-6 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none transition-colors"
-                                    title="Уменьшить"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
-                                    </svg>
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={quantity}
-                                    onChange={(e) => handleQuantityInputChange(product.id, e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleAddToCart(product, quantity)
-                                      }
-                                    }}
-                                    className="w-12 h-6 text-center text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => handleQuantityChange(product.id, 1)}
-                                    className="inline-flex items-center justify-center w-6 h-6 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none transition-colors"
-                                    title="Увеличить"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => handleAddToCart(product, quantity)}
-                                    className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none transition-colors ml-1"
-                                    title="Добавить"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => handlePlusClick(product)}
-                                  className={`inline-flex items-center justify-center w-7 h-7 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all ${
-                                    animatingProduct === product.id ? 'animate-pulse scale-110' : ''
-                                  }`}
-                                  title="Добавить в корзину"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                                  </svg>
-                                </button>
-                              )}
+                            <td className="px-1 sm:px-2 py-1 text-center">
+                              <button
+                                onClick={() => handleAddToCart(product)}
+                                className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all ${
+                                  animatingProduct === product.id ? 'animate-pulse scale-110' : ''
+                                }`}
+                                title="Добавить в корзину"
+                              >
+                                <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                                </svg>
+                              </button>
                             </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             ))}
 
-            {products.length === 0 && (
+            {products.length === 0 && !loading && (
               <div className="text-center py-12">
                 <div className="text-gray-500">Товары не найдены</div>
+              </div>
+            )}
+            
+            {/* Индикатор загрузки при скролле */}
+            {loadingMore && (
+              <div className="text-center py-4">
+                <div className="text-gray-500 text-sm">Загрузка товаров...</div>
+              </div>
+            )}
+            
+            {/* Сообщение, если больше нет товаров */}
+            {!hasMore && products.length > 0 && !searchQuery && (
+              <div className="text-center py-4">
+                <div className="text-gray-500 text-sm">Все товары загружены</div>
               </div>
             )}
           </>

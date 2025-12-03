@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useUserStore } from '../store/userStore'
 import apiClient from '../api/client'
 
@@ -35,11 +35,13 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      setError(
-        err.response?.data?.error || 
-        err.response?.data?.detail || 
-        'Ошибка входа. Проверьте email и пароль.'
-      )
+      const errorMsg = err.response?.data?.error || 
+                      err.response?.data?.detail || 
+                      'Ошибка входа. Проверьте email и пароль.'
+      setError(errorMsg)
+      
+      // Если ошибка связана с неподтвержденным email или неодобренной компанией, 
+      // не показываем alert, так как сообщение уже в setError
     } finally {
       setLoading(false)
     }
@@ -106,6 +108,18 @@ export default function LoginPage() {
             >
               {loading ? 'Вход...' : 'Войти'}
             </button>
+          </div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Нет аккаунта?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Зарегистрироваться
+              </Link>
+            </p>
           </div>
         </form>
       </div>

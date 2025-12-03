@@ -2,8 +2,24 @@ from django.db import models
 
 
 class Supplier(models.Model):
+    PARSING_METHOD_CHOICES = [
+        ('EXCEL', 'Excel парсинг'),
+        ('CSV', 'CSV парсинг'),
+        ('PDF', 'PDF парсинг'),
+        ('WEB_SCRAPING', 'Веб-скрапинг'),
+        ('API', 'API интеграция'),
+        ('MANUAL', 'Ручной ввод'),
+    ]
+
     name = models.CharField(max_length=255, verbose_name='Название поставщика')
     internal_code = models.CharField(max_length=50, unique=True, verbose_name='Внутренний код')
+    contact_person = models.CharField(max_length=255, blank=True, verbose_name='Контактное лицо')
+    phone = models.CharField(max_length=20, blank=True, verbose_name='Телефон')
+    email = models.EmailField(blank=True, verbose_name='Email')
+    address = models.TextField(blank=True, verbose_name='Адрес')
+    website = models.URLField(blank=True, verbose_name='Веб-сайт')
+    default_parsing_method = models.CharField(max_length=20, choices=PARSING_METHOD_CHOICES, default='EXCEL', verbose_name='Метод парсинга по умолчанию')
+    parsing_config = models.JSONField(default=dict, blank=True, verbose_name='Конфигурация парсинга')
     is_active = models.BooleanField(default=True, verbose_name='Активен')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -19,15 +35,29 @@ class Supplier(models.Model):
 class PriceList(models.Model):
     STATUS_CHOICES = [
         ('NEW', 'Новый'),
+        ('PROCESSING', 'Обрабатывается'),
         ('PROCESSED', 'Обработан'),
         ('FAILED', 'Ошибка'),
     ]
 
+    PARSING_METHOD_CHOICES = [
+        ('EXCEL', 'Excel парсинг'),
+        ('CSV', 'CSV парсинг'),
+        ('PDF', 'PDF парсинг'),
+        ('WEB_SCRAPING', 'Веб-скрапинг'),
+        ('API', 'API интеграция'),
+        ('MANUAL', 'Ручной ввод'),
+    ]
+
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='price_lists', verbose_name='Поставщик')
     file = models.FileField(upload_to='pricelists/', verbose_name='Файл')
+    parsing_method = models.CharField(max_length=20, choices=PARSING_METHOD_CHOICES, null=True, blank=True, verbose_name='Метод парсинга')
+    parsing_config = models.JSONField(default=dict, blank=True, verbose_name='Конфигурация парсинга')
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='Загружен')
+    processed_at = models.DateTimeField(null=True, blank=True, verbose_name='Обработан')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW', verbose_name='Статус')
     log = models.TextField(blank=True, verbose_name='Лог обработки')
+    products_count = models.IntegerField(default=0, verbose_name='Количество товаров')
 
     class Meta:
         verbose_name = 'Прайс-лист'

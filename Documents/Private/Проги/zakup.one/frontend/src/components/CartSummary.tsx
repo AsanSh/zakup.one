@@ -23,6 +23,9 @@ export default function CartSummary() {
   const totalAmount = getTotalAmount()
   const totalItems = getTotalItems()
 
+  // Отладочная информация
+  console.log('CartSummary: items count =', items.length, 'items =', items)
+
   const displayUnit = (unit: string) => unitMap[unit] || unit.toLowerCase()
 
   const handleSubmitOrder = async () => {
@@ -30,27 +33,39 @@ export default function CartSummary() {
 
     setIsSubmitting(true)
     try {
-      // Создаем заявку со всеми товарами
-      await apiClient.post('/api/orders/create/', {
+      const orderData = {
         delivery_address: '',
         items: items.map(item => ({
           product_id: item.product_id,
-          quantity: String(item.quantity),
+          quantity: String(item.quantity), // DecimalField требует строку
         }))
-      })
+      }
+      
+      console.log('Отправка заявки:', orderData)
+      
+      // Создаем заявку со всеми товарами
+      const response = await apiClient.post('/api/orders/create/', orderData)
+
+      console.log('Заявка создана:', response.data)
+      console.log('ID заявки:', response.data.id)
+      console.log('Номер заявки:', response.data.order_number)
 
       // Очищаем корзину
       clear()
       
       // Показываем сообщение и переходим к заявкам
       alert('✅ Заявка отправлена!')
+      
+      // Переходим к заявкам
       navigate('/orders')
     } catch (error: any) {
       console.error('Ошибка создания заявки:', error)
+      console.error('Детали ошибки:', error?.response?.data)
       const errorMessage = error?.response?.data?.detail || 
                           error?.response?.data?.message || 
+                          error?.response?.data?.error ||
                           'Ошибка при отправке заявки'
-      alert(errorMessage)
+      alert(`Ошибка: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -62,27 +77,27 @@ export default function CartSummary() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-200 shadow-2xl z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
         {/* Заголовок корзины */}
-        <div className="py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative">
-              <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="py-3 sm:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+          <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+            <div className="relative flex-shrink-0">
+              <svg className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               {totalItems > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
                   {totalItems}
                 </span>
               )}
             </div>
-            <div className="flex-1">
-              <div className="text-base font-semibold text-gray-900">
-                Итого: <span className="text-blue-600">{totalItems}</span> {totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров'} на сумму <span className="text-blue-600 font-bold text-lg">{totalAmount.toLocaleString('ru-RU')} сом</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 truncate">
+                <span className="text-blue-600">{totalItems}</span> {totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров'} на <span className="text-blue-600 font-bold text-sm sm:text-base lg:text-lg">{totalAmount.toLocaleString('ru-RU')} сом</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation()

@@ -1,4 +1,5 @@
 from django.db import models
+from apps.suppliers.models import Supplier
 
 
 class Category(models.Model):
@@ -24,6 +25,7 @@ class Product(models.Model):
 
     name = models.CharField(max_length=255, verbose_name='Название товара')
     article = models.CharField(max_length=100, db_index=True, verbose_name='Артикул')
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Поставщик')
     unit = models.CharField(max_length=20, default='шт', verbose_name='Единица измерения')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Категория')
     origin = models.CharField(max_length=20, choices=ORIGIN_CHOICES, default='РФ', verbose_name='Происхождение')

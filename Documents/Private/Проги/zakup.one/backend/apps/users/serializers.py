@@ -4,17 +4,61 @@ from .models import User, Company
 
 
 class CompanySerializer(serializers.ModelSerializer):
+    users_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Company
-        fields = ['id', 'name', 'phone', 'inn', 'approved']
+        fields = ['id', 'name', 'phone', 'email', 'inn', 'address', 'contact_person',
+                  'approved', 'approved_at', 'approved_by', 'rejection_reason',
+                  'created_at', 'updated_at', 'users_count']
+        read_only_fields = ['approved_at', 'approved_by', 'created_at', 'updated_at']
+
+    def get_users_count(self, obj):
+        return obj.users.count()
+
+
+class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['name', 'phone', 'email', 'inn', 'address', 'contact_person']
+
+
+class CompanyApproveSerializer(serializers.Serializer):
+    approved = serializers.BooleanField()
+    rejection_reason = serializers.CharField(required=False, allow_blank=True)
 
 
 class UserSerializer(serializers.ModelSerializer):
     company = CompanySerializer(read_only=True)
+    company_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name', 'role', 'company', 'is_active']
+        fields = ['id', 'email', 'full_name', 'role', 'company', 'company_id', 'is_active', 'email_verified', 'date_joined']
+        read_only_fields = ['date_joined', 'email_verified']
+
+
+class UserCreateUpdateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
+    company_id = serializers.IntegerField(required=False, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ['email', 'password', 'full_name', 'role', 'company_id', 'is_active']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        if password:
+            user = User.objects.create_user(password=password, **validated_data)
+        else:
+            user = User.objects.create(**validated_data)
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        if password:
+            instance.set_password(password)
+        return super().update(instance, validated_data)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -53,6 +97,3 @@ class RegisterSerializer(serializers.ModelSerializer):
             user.save()
         
         return user
-
-
-

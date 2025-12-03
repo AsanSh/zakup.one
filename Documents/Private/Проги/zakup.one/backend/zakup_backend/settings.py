@@ -2,6 +2,7 @@
 Django settings for zakup_backend project.
 """
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -123,7 +124,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 50,  # Увеличено для лучшей производительности при infinite scroll
 }
 
 CORS_ALLOWED_ORIGINS = [
@@ -152,4 +153,34 @@ CSRF_TRUSTED_ORIGINS = [
 # Elasticsearch settings
 ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST', 'http://search:9200')
 ELASTICSEARCH_INDEX_NAME = 'products'
+
+# Email settings
+# Автоматически выбираем backend: если указаны учетные данные - используем SMTP, иначе - console
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    # Используем реальный SMTP
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False') == 'True'
+else:
+    # Используем console backend для разработки (письма в логи)
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    EMAIL_HOST = 'localhost'
+    EMAIL_PORT = 25
+    EMAIL_USE_TLS = False
+    EMAIL_USE_SSL = False
+
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@zakup.one')
+CONTACT_PHONE = os.getenv('CONTACT_PHONE', '0555555555')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+
+# Если EMAIL_HOST_USER и EMAIL_HOST_PASSWORD не заданы, используем console backend
+if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    logger = logging.getLogger(__name__)
+    logger.warning('EMAIL_HOST_USER или EMAIL_HOST_PASSWORD не заданы. Используется console backend для вывода писем в логи.')
 

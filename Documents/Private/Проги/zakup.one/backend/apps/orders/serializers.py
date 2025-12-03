@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
 from apps.catalog.serializers import ProductSerializer
+from apps.users.serializers import UserSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -14,10 +15,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     total_amount = serializers.SerializerMethodField()
+    client = UserSerializer(read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'client', 'company', 'status', 'delivery_address', 'delivery_date', 
+        fields = ['id', 'order_number', 'client', 'company', 'status', 'delivery_address', 'delivery_date', 
                   'comment', 'created_at', 'updated_at', 'items', 'total_amount']
     
     def get_total_amount(self, obj):
@@ -26,7 +28,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderItemCreateSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
-    quantity = serializers.DecimalField(max_digits=10, decimal_places=2)
+    quantity = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=False)
 
 
 class OrderCreateSerializer(serializers.ModelSerializer):
@@ -37,19 +39,50 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         fields = ['delivery_address', 'delivery_date', 'comment', 'items']
 
     def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        order = Order.objects.create(**validated_data)
+        import logging
+        logger = logging.getLogger(__name__)
         
+        items_data = validated_data.pop('items')
+        # Получаем пользователя из контекста
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError('Request context is missing')
+        
+        user = request.user
+        company = user.company if hasattr(user, 'company') and user.company else None
+        
+        logger.info(f'Creating order for user: {user.email}, company: {company}')
+        logger.info(f'Items data: {items_data}')
+        
+        order = Order.objects.create(
+            client=user,
+            company=company,
+            **validated_data
+        )
+        
+        logger.info(f'Order created: ID={order.id}, order_number={order.order_number}')
+        
+        created_items = 0
         for item_data in items_data:
             from apps.catalog.models import Product
-            product = Product.objects.get(pk=item_data['product_id'])
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=item_data['quantity'],
-                price=product.final_price
-            )
+            try:
+                product = Product.objects.get(pk=item_data['product_id'])
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=item_data['quantity'],
+                    price=product.final_price
+                )
+                created_items += 1
+                logger.info(f'OrderItem created: {product.name} x {item_data["quantity"]}')
+            except Product.DoesNotExist:
+                logger.error(f'Product not found: {item_data["product_id"]}')
+                continue
+            except Exception as e:
+                logger.error(f'Error creating OrderItem: {str(e)}')
+                continue
         
+        logger.info(f'Order {order.id} created with {created_items} items')
         return order
 
 
@@ -64,12 +97,13 @@ class OrderUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['delivery_address', 'delivery_date', 'comment', 'items']
+        fields = ['status', 'delivery_address', 'delivery_date', 'comment', 'items']
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         
         # Обновляем основные поля заявки
+        instance.status = validated_data.get('status', instance.status)
         instance.delivery_address = validated_data.get('delivery_address', instance.delivery_address)
         instance.delivery_date = validated_data.get('delivery_date', instance.delivery_date)
         instance.comment = validated_data.get('comment', instance.comment)
