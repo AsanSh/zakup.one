@@ -1,0 +1,78 @@
+/* Адаптивные улучшения для Django Admin */
+
+/* Улучшение для мобильных устройств */
+@media (max-width: 768px) {
+    /* Уменьшаем отступы */
+    #header {
+        padding: 10px 15px;
+    }
+    
+    #header h1 {
+        font-size: 18px;
+    }
+    
+    /* Адаптивные таблицы */
+    .results {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .results table {
+        min-width: 600px;
+    }
+    
+    /* Улучшение форм */
+    .form-row {
+        flex-direction: column;
+    }
+    
+    .form-row > div {
+        width: 100% !important;
+        margin-bottom: 10px;
+    }
+    
+    /* Кнопки */
+    .submit-row {
+        flex-direction: column;
+    }
+    
+    .submit-row input,
+    .submit-row a {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    /* Меню */
+    #user-tools {
+        font-size: 12px;
+    }
+    
+    /* Контент */
+    #content {
+        padding: 15px;
+    }
+}
+
+/* Планшеты */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #content {
+        padding: 20px;
+    }
+    
+    .results table {
+        font-size: 14px;
+    }
+}
+
+/* Улучшение скролла на touch устройствах */
+@media (hover: none) and (pointer: coarse) {
+    * {
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    input, select, textarea, button {
+        font-size: 16px; /* Предотвращает зум на iOS */
+    }
+}
+
+
