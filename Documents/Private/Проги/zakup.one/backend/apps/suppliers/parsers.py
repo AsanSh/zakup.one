@@ -30,7 +30,7 @@ CATEGORY_BACKGROUND_COLORS = [
 ]
 
 def is_category_color(fill) -> bool:
-    """Проверяет, является ли цвет заливки цветом категории (золотисто-желтый)"""
+    """Проверяет, является ли цвет заливки цветом категории (золотисто-желтый или серый)"""
     if not fill or fill.patternType != 'solid':
         return False
     
@@ -66,6 +66,13 @@ def is_category_color(fill) -> bool:
                     # Дополнительная проверка: G должен быть близок к R
                     if abs(r - g) < 100:
                         return True
+                
+                # Серый цвет для категорий: все компоненты примерно равны и в диапазоне 150-220
+                # Пример: D3D3D3 (RGB: 211, 211, 211) - светло-серый
+                if 150 <= r <= 220 and 150 <= g <= 220 and 150 <= b <= 220:
+                    # Разница между компонентами не должна быть большой (серый цвет)
+                    if abs(r - g) < 30 and abs(g - b) < 30 and abs(r - b) < 30:
+                        return True
             except ValueError:
                 pass
     
@@ -74,13 +81,107 @@ def is_category_color(fill) -> bool:
         color_index = fill.start_color.index
         # Индексы для желтых/золотых оттенков в Excel (расширенный диапазон)
         yellow_indices = list(range(44, 54))  # 44-53
-        if color_index in yellow_indices:
+        # Индексы для серых оттенков
+        gray_indices = list(range(22, 26))  # 22-25 обычно серые
+        if color_index in yellow_indices or color_index in gray_indices:
             return True
     
     # Проверяем theme color (для тем Excel)
     if hasattr(fill.start_color, 'theme') and fill.start_color.theme is not None:
         # Theme 4 обычно соответствует желтым оттенкам
         if fill.start_color.theme in [4, 5, 6]:
+            return True
+    
+    return False
+
+
+def is_white_background(fill) -> bool:
+    """Проверяет, является ли фон ячейки белым (или отсутствует заливка)"""
+    if not fill or fill.patternType != 'solid':
+        return True  # Нет заливки = белый фон
+    
+    if not fill.start_color:
+        return True  # Нет цвета = белый фон
+    
+    # Проверяем RGB цвет
+    if hasattr(fill.start_color, 'rgb') and fill.start_color.rgb:
+        rgb = str(fill.start_color.rgb).upper()
+        rgb_clean = rgb[2:] if rgb.startswith('FF') and len(rgb) == 8 else rgb
+        
+        if len(rgb_clean) == 6:
+            try:
+                r = int(rgb_clean[0:2], 16)
+                g = int(rgb_clean[2:4], 16)
+                b = int(rgb_clean[4:6], 16)
+                
+                # Белый цвет: все компоненты близки к 255 (>= 250)
+                if r >= 250 and g >= 250 and b >= 250:
+                    return True
+            except ValueError:
+                pass
+    
+    # Проверяем индекс цвета
+    if hasattr(fill.start_color, 'index') and fill.start_color.index is not None:
+        # Индекс 0 или None обычно означает белый/нет заливки
+        if fill.start_color.index == 0:
+            return True
+    
+    return False
+
+
+def is_gray_text(font) -> bool:
+    """Проверяет, является ли цвет шрифта серым"""
+    if not font or not font.color:
+        return False  # Нет цвета = черный по умолчанию
+    
+    # Проверяем RGB цвет
+    if hasattr(font.color, 'rgb') and font.color.rgb:
+        rgb = str(font.color.rgb).upper()
+        rgb_clean = rgb[2:] if rgb.startswith('FF') and len(rgb) == 8 else rgb
+        
+        if len(rgb_clean) == 6:
+            try:
+                r = int(rgb_clean[0:2], 16)
+                g = int(rgb_clean[2:4], 16)
+                b = int(rgb_clean[4:6], 16)
+                
+                # Серый цвет шрифта: все компоненты примерно равны и в диапазоне 100-200
+                # Черный цвет: все компоненты < 50
+                # Серый: компоненты в диапазоне 100-200 и примерно равны
+                if 100 <= r <= 200 and 100 <= g <= 200 and 100 <= b <= 200:
+                    if abs(r - g) < 30 and abs(g - b) < 30 and abs(r - b) < 30:
+                        return True
+            except ValueError:
+                pass
+    
+    return False
+
+
+def is_black_text(font) -> bool:
+    """Проверяет, является ли цвет шрифта черным (или отсутствует)"""
+    if not font or not font.color:
+        return True  # Нет цвета = черный по умолчанию
+    
+    # Проверяем RGB цвет
+    if hasattr(font.color, 'rgb') and font.color.rgb:
+        rgb = str(font.color.rgb).upper()
+        rgb_clean = rgb[2:] if rgb.startswith('FF') and len(rgb) == 8 else rgb
+        
+        if len(rgb_clean) == 6:
+            try:
+                r = int(rgb_clean[0:2], 16)
+                g = int(rgb_clean[2:4], 16)
+                b = int(rgb_clean[4:6], 16)
+                
+                # Черный цвет: все компоненты < 50
+                if r < 50 and g < 50 and b < 50:
+                    return True
+            except ValueError:
+                pass
+    
+    # Если индекс цвета 1 (черный) или None (по умолчанию черный)
+    if hasattr(font.color, 'index'):
+        if font.color.index is None or font.color.index == 1:
             return True
     
     return False
@@ -267,72 +368,160 @@ class ExcelPriceListParser:
     def _parse_data_new(self, df: pd.DataFrame, start_row: int, end_row: int, 
                        product_col: int, unit_col: int, price_col: int):
         """
-        Новый метод парсинга данных
+        Улучшенный метод парсинга данных с учетом цветов ячеек
         
-        Алгоритм:
-        1. Строка без цены, но с названием — категория (или если цвет фона категории)
-        2. Строка с названием и ценой — товар
+        Правила для формата Стройдвор:
+        1. Если цвет ячейки не белый - это не товар (пропускаем)
+        2. Если цвет ячейки серый И цвет шрифта серый - это категория/подкатегория
+        3. Если цвет ячейки белый И цвет шрифта черный:
+           - Данные в столбцах 1-2 (индексы 0-1) - название товара
+           - На следующей строке - единица измерения
+           - На следующей строке - цена
         """
         current_category: Optional[str] = None
+        current_subcategory: Optional[str] = None
         
         # Берём только строки с данными (между заголовком и последней ценой)
         data = df.iloc[start_row:end_row].copy()
         
-        for idx, row in data.iterrows():
-            raw_name = row[product_col]
-            raw_unit = row[unit_col]
-            raw_price = row[price_col]
+        i = 0
+        data_list = list(data.iterrows())
+        
+        while i < len(data_list):
+            idx, row = data_list[i]
             
-            name = self._to_str_or_none(raw_name)
+            # Получаем значения из столбцов 1-2 (индексы 0-1)
+            col0_value = self._to_str_or_none(row.iloc[0] if len(row) > 0 else None)  # Столбец 1
+            col1_value = self._to_str_or_none(row.iloc[1] if len(row) > 1 else None)  # Столбец 2
+            
+            # Получаем единицу измерения и цену из текущей строки (на случай стандартного формата)
+            raw_unit = row[unit_col] if unit_col < len(row) else None
+            raw_price = row[price_col] if price_col < len(row) else None
+            
             unit = self._to_str_or_none(raw_unit)
             price = self._to_float_or_nan(raw_price)
             
-            is_price_nan = math.isnan(price)
+            # Получаем информацию о цветах ячеек
+            is_white_bg = True
+            is_category_bg = False
+            has_gray_text = False
+            has_black_text = True
             
-            # Полностью пустая строка — пропускаем
-            if not name and not unit and is_price_nan:
-                continue
-            
-            # ПРИОРИТЕТ 1: Проверяем цвет фона ячейки (если есть название)
-            is_category_by_color = False
-            if name and self.worksheet:
+            if self.worksheet:
                 try:
-                    # Excel строки начинаются с 1, а pandas индексы с 0
-                    cell = self.worksheet.cell(row=idx+1, column=product_col+1)
-                    fill = cell.fill
-                    is_category_by_color = is_category_color(fill)
-                    if is_category_by_color:
-                        logger.debug(f"Найдена категория по цвету фона: '{name}'")
+                    # Проверяем ячейку в столбце 1 (индекс 0)
+                    cell_col0 = self.worksheet.cell(row=idx+1, column=1)
+                    fill_col0 = cell_col0.fill
+                    font_col0 = cell_col0.font
+                    
+                    is_white_bg = is_white_background(fill_col0)
+                    is_category_bg = is_category_color(fill_col0)
+                    has_gray_text = is_gray_text(font_col0)
+                    has_black_text = is_black_text(font_col0)
                 except Exception as e:
-                    logger.debug(f"Ошибка чтения цвета ячейки row={idx+1}, col={product_col+1}: {str(e)}")
+                    logger.debug(f"Ошибка чтения цвета ячейки row={idx+1}, col=1: {str(e)}")
             
-            # Строка без цены, но с названием — считаем заголовком категории
-            # ИЛИ если цвет фона указывает на категорию
-            if name and (is_price_nan or is_category_by_color):
-                current_category = name
-                if current_category not in self.categories:
-                    self.categories.append(current_category)
-                logger.debug(f"Найдена категория: {current_category}")
+            # Пропускаем полностью пустые строки
+            if not col0_value and not col1_value and not unit and math.isnan(price):
+                i += 1
                 continue
             
-            # Обычная товарная строка: есть название и цена
-            if name and not is_price_nan:
-                # Нормализуем единицу измерения
-                unit_normalized = self._normalize_unit(unit) if unit else 'шт'
+            # ПРАВИЛО 1: Если цвет ячейки не белый - это не товар (пропускаем или категория)
+            if not is_white_bg:
+                # Если это категория по цвету (серый фон + серый шрифт)
+                if is_category_bg and has_gray_text and col0_value:
+                    current_category = col0_value
+                    if current_category not in self.categories:
+                        self.categories.append(current_category)
+                    logger.debug(f"Найдена категория по цвету (серый фон + серый шрифт): '{current_category}'")
+                    current_subcategory = None  # Сбрасываем подкатегорию при новой категории
+                i += 1
+                continue
+            
+            # ПРАВИЛО 2: Если белый фон + черный шрифт + есть данные в столбцах 1-2
+            if is_white_bg and has_black_text and (col0_value or col1_value):
+                product_name = col0_value or col1_value
+                product_unit = None
+                product_price = None
+                skip_next_rows = 0
                 
-                # Генерируем артикул
-                article = self._generate_article(name)
+                # ВАРИАНТ 1: Проверяем текущую строку (стандартный формат)
+                if unit and self._is_unit_measurement(unit):
+                    product_unit = unit
+                if not math.isnan(price):
+                    product_price = price
                 
-                product = {
-                    'name': name,
-                    'article': article,
-                    'unit': unit_normalized,
-                    'price': float(price),
-                    'category': current_category
-                }
+                # ВАРИАНТ 2: Если не нашли в текущей строке, проверяем следующие строки
+                if not product_unit or math.isnan(product_price) if product_price is None else False:
+                    # Проверяем следующую строку на единицу измерения
+                    if i + 1 < len(data_list):
+                        next_idx, next_row = data_list[i + 1]
+                        
+                        # Проверяем цвет следующей строки (должна быть белой для товара)
+                        next_is_white = True
+                        if self.worksheet:
+                            try:
+                                next_cell = self.worksheet.cell(row=next_idx+1, column=1)
+                                next_is_white = is_white_background(next_cell.fill)
+                            except:
+                                pass
+                        
+                        if next_is_white:
+                            # Проверяем столбец единицы измерения
+                            next_unit = self._to_str_or_none(next_row.iloc[unit_col] if unit_col < len(next_row) else None)
+                            if next_unit and self._is_unit_measurement(next_unit):
+                                product_unit = next_unit
+                                skip_next_rows = 1
+                                
+                                # Проверяем следующую строку на цену
+                                if i + 2 < len(data_list):
+                                    price_idx, price_row = data_list[i + 2]
+                                    
+                                    # Проверяем цвет строки с ценой
+                                    price_is_white = True
+                                    if self.worksheet:
+                                        try:
+                                            price_cell = self.worksheet.cell(row=price_idx+1, column=1)
+                                            price_is_white = is_white_background(price_cell.fill)
+                                        except:
+                                            pass
+                                    
+                                    if price_is_white:
+                                        product_price = self._to_float_or_nan(price_row.iloc[price_col] if price_col < len(price_row) else None)
+                                        if not math.isnan(product_price):
+                                            skip_next_rows = 2
                 
-                self.products.append(product)
-                logger.debug(f"Извлечен товар: {name}, цена: {price}, единица: {unit_normalized}, категория: {current_category}")
+                # Если нашли товар (есть название, единица измерения и цена)
+                if product_name and product_unit and product_price and not math.isnan(product_price):
+                    # Нормализуем единицу измерения
+                    unit_normalized = self._normalize_unit(product_unit)
+                    
+                    # Генерируем артикул
+                    article = self._generate_article(product_name)
+                    
+                    # Используем категорию или подкатегорию
+                    category = current_subcategory or current_category
+                    
+                    product = {
+                        'name': product_name,
+                        'article': article,
+                        'unit': unit_normalized,
+                        'price': float(product_price),
+                        'category': category
+                    }
+                    
+                    self.products.append(product)
+                    logger.debug(f"Извлечен товар: {product_name}, цена: {product_price}, единица: {unit_normalized}, категория: {category}")
+                    
+                    # Пропускаем строки с единицей измерения и ценой, если они были на следующих строках
+                    i += skip_next_rows
+                else:
+                    # Если есть название, но нет единицы измерения или цены - возможно подкатегория
+                    if product_name and not product_unit:
+                        current_subcategory = product_name
+                        logger.debug(f"Найдена подкатегория: '{current_subcategory}'")
+            
+            i += 1
         
         logger.info(f"Распознано товаров: {len(self.products)}, категорий: {len(self.categories)}")
         if len(self.products) == 0:
