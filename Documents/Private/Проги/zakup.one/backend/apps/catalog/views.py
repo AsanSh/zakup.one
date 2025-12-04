@@ -47,7 +47,14 @@ class ProductViewSet(ModelViewSet):
         if supplier_id:
             queryset = queryset.filter(supplier_id=supplier_id)
         
-        return queryset.order_by('-created_at')
+        # Сортировка по умолчанию - по названию (алфавит)
+        ordering = self.request.query_params.get('ordering', 'name')
+        if ordering:
+            queryset = queryset.order_by(ordering)
+        else:
+            queryset = queryset.order_by('name')
+        
+        return queryset
 
 
 class ProductListView(ListAPIView):

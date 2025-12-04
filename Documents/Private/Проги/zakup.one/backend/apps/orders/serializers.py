@@ -49,18 +49,19 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Request context is missing')
         
         user = request.user
-        company = user.company if hasattr(user, 'company') and user.company else None
+        company = getattr(user, 'company', None) if hasattr(user, 'company') else None
         
-        logger.info(f'Creating order for user: {user.email}, company: {company}')
+        logger.info(f'Creating order for user: {user.email} (ID: {user.id}), company: {company}')
         logger.info(f'Items data: {items_data}')
         
+        # client и company будут установлены в perform_create, но на всякий случай устанавливаем здесь тоже
         order = Order.objects.create(
             client=user,
             company=company,
             **validated_data
         )
         
-        logger.info(f'Order created: ID={order.id}, order_number={order.order_number}')
+        logger.info(f'Order created: ID={order.id}, order_number={order.order_number}, client={order.client.email}')
         
         created_items = 0
         for item_data in items_data:

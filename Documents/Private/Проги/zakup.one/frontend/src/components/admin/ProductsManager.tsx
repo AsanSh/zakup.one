@@ -29,6 +29,7 @@ export default function ProductsManager() {
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     loadProducts()
@@ -39,14 +40,34 @@ export default function ProductsManager() {
     setLoading(true)
     try {
       const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''
-      const url = `/api/catalog/products-admin/?page=${page}${searchParam}`
+      const orderingParam = sortOrder === 'asc' ? '&ordering=name' : '&ordering=-name'
+      const url = `/api/catalog/products-admin/?page=${page}${searchParam}${orderingParam}`
       const res = await apiClient.get(url)
       // Обрабатываем пагинацию
       const productsData = res.data.results || res.data || []
+      
+      // Дополнительная сортировка на клиенте для гарантии
+      const sorted = [...productsData].sort((a, b) => {
+        const nameA = a.name.toLowerCase()
+        const nameB = b.name.toLowerCase()
+        return sortOrder === 'asc' 
+          ? nameA.localeCompare(nameB, 'ru')
+          : nameB.localeCompare(nameA, 'ru')
+      })
+      
       if (page === 1) {
-        setProducts(productsData)
+        setProducts(sorted)
       } else {
-        setProducts(prev => [...prev, ...productsData])
+        setProducts(prev => {
+          const combined = [...prev, ...sorted]
+          return combined.sort((a, b) => {
+            const nameA = a.name.toLowerCase()
+            const nameB = b.name.toLowerCase()
+            return sortOrder === 'asc' 
+              ? nameA.localeCompare(nameB, 'ru')
+              : nameB.localeCompare(nameA, 'ru')
+          })
+        })
       }
     } catch (error) {
       console.error('Ошибка загрузки товаров:', error)
@@ -61,7 +82,7 @@ export default function ProductsManager() {
       loadProducts()
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, sortOrder])
 
   const loadSuppliers = async () => {
     try {
@@ -129,15 +150,33 @@ export default function ProductsManager() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           />
-          <button
-            onClick={() => {
-              setEditingProduct(null)
-              setShowModal(true)
-            }}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
-          >
-            + Добавить товар
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1"
+              title={sortOrder === 'asc' ? 'По убыванию' : 'По возрастанию'}
+            >
+              <span>А-Я</span>
+              {sortOrder === 'asc' ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setEditingProduct(null)
+                setShowModal(true)
+              }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+            >
+              + Добавить товар
+            </button>
+          </div>
         </div>
       </div>
 

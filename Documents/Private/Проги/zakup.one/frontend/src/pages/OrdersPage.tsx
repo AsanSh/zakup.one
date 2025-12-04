@@ -227,13 +227,15 @@ export default function OrdersPage() {
     }
 
     try {
-      await apiClient.delete(`/api/orders/${orderId}/delete/`)
+      // Используем стандартный REST endpoint для удаления
+      await apiClient.delete(`/api/orders/${orderId}/`)
       await loadOrders()
       alert('Заявка успешно удалена')
     } catch (error: any) {
       console.error('Ошибка удаления заявки:', error)
       const errorMessage = error?.response?.data?.detail || 
                           error?.response?.data?.message || 
+                          error?.response?.data?.error ||
                           'Ошибка при удалении заявки'
       alert(errorMessage)
     }

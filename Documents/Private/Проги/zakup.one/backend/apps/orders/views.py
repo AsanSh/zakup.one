@@ -15,12 +15,13 @@ class OrderViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Order.objects.all()
+        # Админ видит все, клиент — только свои
+        if user.role == 'ADMIN':
+            queryset = Order.objects.all()
+        else:
+            queryset = Order.objects.filter(client=user)
         
-        if user.role != 'ADMIN':
-            queryset = queryset.filter(client=user)
-        
-        # Фильтрация по статусу
+        # Фильтрация по статусу (опционально)
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
             queryset = queryset.filter(status=status_filter)
@@ -35,8 +36,9 @@ class OrderViewSet(ModelViewSet):
         return OrderSerializer
 
     def perform_create(self, serializer):
+        """Устанавливаем client и company при создании заявки"""
         user = self.request.user
-        company = user.company if hasattr(user, 'company') and user.company else None
+        company = getattr(user, 'company', None) if hasattr(user, 'company') else None
         serializer.save(client=user, company=company)
 
     @action(detail=True, methods=['patch'])
