@@ -37,7 +37,7 @@ export default function CartSummary() {
         delivery_address: '',
         items: items.map(item => ({
           product_id: item.product_id,
-          quantity: String(item.quantity), // DecimalField требует строку
+          quantity: Number(item.quantity), // DecimalField ожидает число
         }))
       }
       

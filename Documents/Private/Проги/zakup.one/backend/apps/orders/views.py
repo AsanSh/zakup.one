@@ -35,11 +35,16 @@ class OrderViewSet(ModelViewSet):
             return OrderUpdateSerializer
         return OrderSerializer
 
+    def get_serializer_context(self):
+        """Передаем request в контекст сериализатора"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def perform_create(self, serializer):
         """Устанавливаем client и company при создании заявки"""
-        user = self.request.user
-        company = getattr(user, 'company', None) if hasattr(user, 'company') else None
-        serializer.save(client=user, company=company)
+        # client и company уже устанавливаются в сериализаторе через context
+        serializer.save()
 
     @action(detail=True, methods=['patch'])
     def change_status(self, request, pk=None):
