@@ -231,7 +231,25 @@ class ExcelPriceListParser:
                 self.worksheet = self.workbook.active
             
             # Читаем Excel файл через pandas для данных
-            df = pd.read_excel(self.file_path, sheet_name=sheet_name, header=None, engine='openpyxl')
+            excel_data = pd.read_excel(self.file_path, sheet_name=sheet_name, header=None, engine='openpyxl')
+            
+            # Проверяем, что получили DataFrame, а не словарь (если несколько листов)
+            if isinstance(excel_data, dict):
+                # Если словарь, берем первый лист или указанный лист
+                if sheet_name and sheet_name in excel_data:
+                    df = excel_data[sheet_name]
+                else:
+                    # Берем первый лист
+                    first_sheet = list(excel_data.keys())[0]
+                    df = excel_data[first_sheet]
+                    logger.info(f"Файл содержит несколько листов. Используется лист: {first_sheet}")
+            else:
+                df = excel_data
+            
+            # Убеждаемся, что df - это DataFrame
+            if not isinstance(df, pd.DataFrame):
+                raise ValueError(f"Ожидался DataFrame, получен {type(df)}")
+            
             logger.info(f"Файл прочитан. Строк: {len(df)}, Колонок: {len(df.columns) if len(df) > 0 else 0}")
             
             # Ищем строку с заголовком "Товар"
@@ -390,13 +408,34 @@ class ExcelPriceListParser:
         while i < len(data_list):
             idx, row = data_list[i]
             
+            # row - это pandas Series, используем iloc для доступа по индексу
             # Получаем значения из столбцов 1-2 (индексы 0-1)
-            col0_value = self._to_str_or_none(row.iloc[0] if len(row) > 0 else None)  # Столбец 1
-            col1_value = self._to_str_or_none(row.iloc[1] if len(row) > 1 else None)  # Столбец 2
+            col0_value = None
+            col1_value = None
+            if len(row) > 0:
+                try:
+                    col0_value = self._to_str_or_none(row.iloc[0])  # Столбец 1
+                except (IndexError, KeyError):
+                    pass
+            if len(row) > 1:
+                try:
+                    col1_value = self._to_str_or_none(row.iloc[1])  # Столбец 2
+                except (IndexError, KeyError):
+                    pass
             
             # Получаем единицу измерения и цену из текущей строки (на случай стандартного формата)
-            raw_unit = row[unit_col] if unit_col < len(row) else None
-            raw_price = row[price_col] if price_col < len(row) else None
+            raw_unit = None
+            raw_price = None
+            try:
+                if unit_col < len(row):
+                    raw_unit = row.iloc[unit_col] if hasattr(row, 'iloc') else row[unit_col]
+            except (IndexError, KeyError):
+                pass
+            try:
+                if price_col < len(row):
+                    raw_price = row.iloc[price_col] if hasattr(row, 'iloc') else row[price_col]
+            except (IndexError, KeyError):
+                pass
             
             unit = self._to_str_or_none(raw_unit)
             price = self._to_float_or_nan(raw_price)
@@ -468,7 +507,12 @@ class ExcelPriceListParser:
                         
                         if next_is_white:
                             # Проверяем столбец единицы измерения
-                            next_unit = self._to_str_or_none(next_row.iloc[unit_col] if unit_col < len(next_row) else None)
+                            next_unit = None
+                            try:
+                                if unit_col < len(next_row):
+                                    next_unit = self._to_str_or_none(next_row.iloc[unit_col] if hasattr(next_row, 'iloc') else next_row[unit_col])
+                            except (IndexError, KeyError):
+                                pass
                             if next_unit and self._is_unit_measurement(next_unit):
                                 product_unit = next_unit
                                 skip_next_rows = 1
@@ -487,7 +531,14 @@ class ExcelPriceListParser:
                                             pass
                                     
                                     if price_is_white:
-                                        product_price = self._to_float_or_nan(price_row.iloc[price_col] if price_col < len(price_row) else None)
+                                        try:
+                                            if price_col < len(price_row):
+                                                price_val = price_row.iloc[price_col] if hasattr(price_row, 'iloc') else price_row[price_col]
+                                                product_price = self._to_float_or_nan(price_val)
+                                            else:
+                                                product_price = float("nan")
+                                        except (IndexError, KeyError):
+                                            product_price = float("nan")
                                         if not math.isnan(product_price):
                                             skip_next_rows = 2
                 
