@@ -22,13 +22,21 @@ class LoginView(APIView):
     authentication_classes = []  # Отключаем аутентификацию для логина
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
         email = request.data.get('email')
         password = request.data.get('password')
         
+        logger.info(f'Login attempt: email={email}')
+        
         if not email or not password:
+            logger.warning('Login failed: email or password missing')
             return Response({'error': 'Email и пароль обязательны'}, status=status.HTTP_400_BAD_REQUEST)
         
         user = authenticate(username=email, password=password)
+        logger.info(f'Authenticate result: user={user}, is_active={user.is_active if user else None}')
+        
         if user and user.is_active:
             # Для клиентов проверяем одобрение компании
             if user.role == 'CLIENT' and user.company and not user.company.approved:
