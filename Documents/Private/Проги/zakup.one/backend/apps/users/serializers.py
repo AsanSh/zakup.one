@@ -78,22 +78,41 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        company_name = validated_data.pop('company_name', None)
-        company_phone = validated_data.pop('company_phone', None)
-        company_inn = validated_data.pop('company_inn', None)
-        validated_data.pop('password_confirm')
+        import logging
+        logger = logging.getLogger(__name__)
         
-        password = validated_data.pop('password')
-        user = User.objects.create_user(password=password, **validated_data)
-        
-        if company_name:
-            company = Company.objects.create(
-                name=company_name,
-                phone=company_phone or '',
-                inn=company_inn or '',
-                approved=False
-            )
-            user.company = company
-            user.save()
-        
-        return user
+        try:
+            company_name = validated_data.pop('company_name', None)
+            company_phone = validated_data.pop('company_phone', None)
+            company_inn = validated_data.pop('company_inn', None)
+            validated_data.pop('password_confirm')
+            
+            # Очищаем пустые строки
+            if company_name == '' or company_name is None:
+                company_name = None
+            if company_phone == '' or company_phone is None:
+                company_phone = None
+            if company_inn == '' or company_inn is None:
+                company_inn = None
+            
+            logger.info(f'Creating user with email: {validated_data.get("email")}, company_name: {company_name}')
+            
+            password = validated_data.pop('password')
+            user = User.objects.create_user(password=password, **validated_data)
+            
+            if company_name:
+                company = Company.objects.create(
+                    name=company_name,
+                    phone=company_phone or '',
+                    inn=company_inn or '',
+                    approved=False
+                )
+                user.company = company
+                user.save()
+                logger.info(f'Company created for user {user.email}: {company.name}')
+            
+            logger.info(f'User created successfully: {user.email}')
+            return user
+        except Exception as e:
+            logger.error(f'Error in RegisterSerializer.create: {str(e)}', exc_info=True)
+            raise
