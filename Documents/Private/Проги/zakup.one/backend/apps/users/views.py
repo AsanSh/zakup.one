@@ -52,8 +52,15 @@ class RegisterView(APIView):
     authentication_classes = []  # Отключаем аутентификацию для регистрации
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f'Registration request received. Data: {request.data}')
+        logger.info(f'Request headers: {dict(request.headers)}')
+        
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
+            logger.info('Serializer is valid, creating user...')
             try:
                 user = serializer.save()
                 # Автоматически помечаем email как подтвержденный
@@ -91,6 +98,8 @@ class RegisterView(APIView):
                 return Response({
                     'error': 'Ошибка при создании аккаунта. Попробуйте еще раз.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        logger.error(f'Serializer validation failed. Errors: {serializer.errors}')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
