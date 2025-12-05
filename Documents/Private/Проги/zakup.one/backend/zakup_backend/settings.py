@@ -135,6 +135,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://5.101.67.195",
     "http://zakup.one",
     "https://zakup.one",
+    "https://www.zakup.one",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -142,7 +143,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Настройки сессий для единой авторизации
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = False  # True для HTTPS
+SESSION_COOKIE_SECURE = True  # True для HTTPS (теперь используем SSL)
 SESSION_COOKIE_AGE = 86400  # 24 часа
 
 # CSRF настройки
@@ -154,7 +155,12 @@ CSRF_TRUSTED_ORIGINS = [
     "http://5.101.67.195",
     "http://zakup.one",
     "https://zakup.one",
+    "https://www.zakup.one",
 ]
+
+# Настройки для работы за прокси (Nginx)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_TZ = True
 
 # Elasticsearch settings
 ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST', 'http://search:9200')
