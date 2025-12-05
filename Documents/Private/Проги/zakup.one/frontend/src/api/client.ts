@@ -8,15 +8,17 @@ const getApiUrl = () => {
   // В браузере всегда используем относительный путь
   if (typeof window !== 'undefined') {
     // Если VITE_API_URL задан и не пустой, используем его
+    // Но в production всегда используем относительный путь
     const envUrl = import.meta.env.VITE_API_URL
-    if (envUrl && envUrl.trim() !== '') {
+    if (envUrl && envUrl.trim() !== '' && import.meta.env.DEV) {
+      // Только в режиме разработки используем явный URL
       return envUrl
     }
-    // Иначе используем относительный путь (пустая строка)
+    // В production всегда используем относительный путь (пустая строка)
     return ''
   }
-  // На сервере (SSR) используем localhost только для разработки
-  return import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  // На сервере (SSR) - не используется в нашем случае, но на всякий случай
+  return ''
 }
 
 export const apiClient = axios.create({
