@@ -41,7 +41,7 @@ export default function ProductsManager() {
     try {
       const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''
       const orderingParam = sortOrder === 'asc' ? '&ordering=name' : '&ordering=-name'
-      const url = `/api/catalog/products-admin/?page=${page}${searchParam}${orderingParam}`
+      const url = `/catalog/products-admin/?page=${page}${searchParam}${orderingParam}`
       const res = await apiClient.get(url)
       // Обрабатываем пагинацию
       const productsData = res.data.results || res.data || []
@@ -97,7 +97,7 @@ export default function ProductsManager() {
     if (!confirm('Вы уверены, что хотите удалить этот товар?')) return
     
     try {
-      await apiClient.delete(`/api/catalog/products-admin/${id}/`)
+      await apiClient.delete(`/catalog/products-admin/${id}/`)
       loadProducts()
     } catch (error) {
       alert('Ошибка при удалении товара')
@@ -122,7 +122,7 @@ export default function ProductsManager() {
 
     try {
       if (editingProduct) {
-        await apiClient.patch(`/api/catalog/products-admin/${editingProduct.id}/`, data)
+        await apiClient.patch(`/catalog/products-admin/${editingProduct.id}/`, data)
       } else {
         await apiClient.post('/catalog/products-admin/', data)
       }

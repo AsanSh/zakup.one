@@ -73,7 +73,7 @@ export default function ClientsManager() {
 
   const handleApproveCompany = async (companyId: number, approved: boolean, reason?: string) => {
     try {
-      await apiClient.post(`/api/auth/companies/${companyId}/approve/`, {
+      await apiClient.post(`/auth/companies/${companyId}/approve/`, {
         approved,
         rejection_reason: reason || ''
       })
@@ -88,7 +88,7 @@ export default function ClientsManager() {
     if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return
     
     try {
-      await apiClient.delete(`/api/auth/users/${userId}/`)
+      await apiClient.delete(`/auth/users/${userId}/`)
       loadClients()
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.error || 'Ошибка при удалении пользователя')
@@ -114,7 +114,7 @@ export default function ClientsManager() {
     }
 
     try {
-      await apiClient.patch(`/api/auth/users/${editingUser.id}/`, data)
+      await apiClient.patch(`/auth/users/${editingUser.id}/`, data)
       setShowUserEditModal(false)
       setEditingUser(null)
       loadClients()

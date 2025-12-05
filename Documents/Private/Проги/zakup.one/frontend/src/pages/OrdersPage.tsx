@@ -195,7 +195,7 @@ export default function OrdersPage() {
           quantity: String(item.quantity),
         }))
 
-      await apiClient.put(`/api/orders/${editingOrder.id}/`, updateData)
+      await apiClient.put(`/orders/${editingOrder.id}/`, updateData)
       
       // Обновляем список заявок
       await loadOrders()
@@ -228,7 +228,7 @@ export default function OrdersPage() {
 
     try {
       // Используем стандартный REST endpoint для удаления
-      await apiClient.delete(`/api/orders/${orderId}/`)
+      await apiClient.delete(`/orders/${orderId}/`)
       await loadOrders()
       alert('Заявка успешно удалена')
     } catch (error: any) {

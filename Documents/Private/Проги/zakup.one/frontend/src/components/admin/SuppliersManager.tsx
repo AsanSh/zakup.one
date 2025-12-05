@@ -80,7 +80,7 @@ export default function SuppliersManager() {
 
   const loadPriceLists = async (supplierId: number) => {
     try {
-      const res = await apiClient.get(`/api/admin/pricelists/?supplier_id=${supplierId}`)
+      const res = await apiClient.get(`/admin/pricelists/?supplier_id=${supplierId}`)
       const lists = res.data.results || res.data || []
       setPriceLists(lists)
       
@@ -101,7 +101,7 @@ export default function SuppliersManager() {
     if (!confirm('Вы уверены, что хотите удалить этого поставщика?')) return
     
     try {
-      await apiClient.delete(`/api/admin/suppliers/${id}/`)
+      await apiClient.delete(`/admin/suppliers/${id}/`)
       loadSuppliers()
     } catch (error) {
       alert('Ошибка при удалении поставщика')
@@ -132,7 +132,7 @@ export default function SuppliersManager() {
 
     try {
       if (editingSupplier) {
-        await apiClient.patch(`/api/admin/suppliers/${editingSupplier.id}/`, data)
+        await apiClient.patch(`/admin/suppliers/${editingSupplier.id}/`, data)
       } else {
         await apiClient.post('/admin/suppliers/', data)
       }
@@ -621,7 +621,7 @@ export default function SuppliersManager() {
                             <button
                               onClick={async () => {
                                 try {
-                                  await apiClient.post(`/api/admin/pricelists/${pl.id}/process/`)
+                                  await apiClient.post(`/admin/pricelists/${pl.id}/process/`)
                                   setProcessingPriceLists(prev => new Set(prev).add(pl.id))
                                   loadPriceLists(selectedSupplier.id)
                                 } catch (error) {
@@ -638,7 +638,7 @@ export default function SuppliersManager() {
                             <button
                               onClick={async () => {
                                 try {
-                                  await apiClient.post(`/api/admin/pricelists/${pl.id}/process/`)
+                                  await apiClient.post(`/admin/pricelists/${pl.id}/process/`)
                                   setProcessingPriceLists(prev => new Set(prev).add(pl.id))
                                   loadPriceLists(selectedSupplier.id)
                                 } catch (error) {

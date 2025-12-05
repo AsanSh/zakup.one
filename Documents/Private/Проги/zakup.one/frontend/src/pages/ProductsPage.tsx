@@ -84,7 +84,7 @@ export default function ProductsPage() {
         setHasMore(true)
       }
       
-      const response = await apiClient.get(`/api/catalog/products/?page=${page}`)
+      const response = await apiClient.get(`/catalog/products/?page=${page}`)
       const productsData = response.data.results || response.data || []
       const nextPage = response.data.next
       
@@ -155,7 +155,7 @@ export default function ProductsPage() {
     if (query.trim()) {
       try {
         setLoading(true)
-        const response = await apiClient.get(`/api/catalog/search/?q=${encodeURIComponent(query)}`)
+        const response = await apiClient.get(`/catalog/search/?q=${encodeURIComponent(query)}`)
         setProducts(response.data.results || [])
         setHasMore(false) // При поиске не загружаем больше
       } catch (error) {

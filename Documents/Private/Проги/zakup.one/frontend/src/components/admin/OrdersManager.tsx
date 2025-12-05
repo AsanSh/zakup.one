@@ -32,8 +32,8 @@ export default function OrdersManager() {
     setLoading(true)
     try {
       const url = selectedStatus 
-        ? `/api/orders/orders-admin/?status=${selectedStatus}`
-        : '/api/orders/orders-admin/'
+        ? `/orders/orders-admin/?status=${selectedStatus}`
+        : '/orders/orders-admin/'
       const res = await apiClient.get(url)
       setOrders(res.data.results || res.data || [])
     } catch (error) {
@@ -45,12 +45,12 @@ export default function OrdersManager() {
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     try {
-      await apiClient.patch(`/api/orders/orders-admin/${orderId}/change_status/`, { status: newStatus })
+      await apiClient.patch(`/orders/orders-admin/${orderId}/change_status/`, { status: newStatus })
       loadOrders()
     } catch (error: any) {
       // Если endpoint не работает, попробуем обновить через обычный PATCH
       try {
-        await apiClient.patch(`/api/orders/orders-admin/${orderId}/`, { status: newStatus })
+        await apiClient.patch(`/orders/orders-admin/${orderId}/`, { status: newStatus })
         loadOrders()
       } catch (e: any) {
         alert(e?.response?.data?.error || 'Ошибка при изменении статуса')
