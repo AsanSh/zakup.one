@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Используем относительный путь для API, чтобы запросы шли через Nginx
+// Это решает проблемы с CORS и дизайном
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? '' : 'http://localhost:8000')
 
 export const apiClient = axios.create({
   baseURL: API_URL,

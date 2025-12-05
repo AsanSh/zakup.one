@@ -59,9 +59,9 @@ services:
       context: ..
       dockerfile: infra/frontend.prod.Dockerfile
       args:
-        - VITE_API_URL=http://5.101.67.195
+        - VITE_API_URL=
     environment:
-      - VITE_API_URL=http://5.101.67.195
+      - VITE_API_URL=
     restart: unless-stopped
     ports:
       - "5173:80"
