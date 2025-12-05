@@ -2,7 +2,19 @@ import axios from 'axios'
 
 // Используем относительный путь для API, чтобы запросы шли через Nginx
 // Это решает проблемы с CORS и дизайном
-const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? '' : 'http://localhost:8000')
+// Если страница загружена по HTTPS, относительный путь автоматически использует HTTPS
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  if (typeof window !== 'undefined') {
+    // Используем относительный путь - браузер автоматически использует тот же протокол (HTTP/HTTPS)
+    return ''
+  }
+  return 'http://localhost:8000'
+}
+
+const API_URL = getApiUrl()
 
 export const apiClient = axios.create({
   baseURL: API_URL,
