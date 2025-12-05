@@ -33,12 +33,21 @@ const AuthLanding: React.FC = () => {
   const { setUser, setToken } = useUserStore()
 
   const handleLogin = async (e: React.FormEvent) => {
+    console.log('=== HANDLE LOGIN CALLED ===')
+    console.log('Event:', e)
+    console.log('Email:', email)
+    console.log('Password length:', password.length)
+    
     e.preventDefault()
     setError('')
     setLoading(true)
 
+    console.log('Loading set to true, starting request...')
+
     try {
       console.log('Отправка запроса входа:', { email, password: '***' })
+      console.log('API URL:', '/api/auth/login/')
+      console.log('Request data:', { email, password: '***' })
       
       const response = await apiClient.post('/api/auth/login/', {
         email,

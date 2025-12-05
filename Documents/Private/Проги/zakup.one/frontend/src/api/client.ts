@@ -20,17 +20,42 @@ export const apiClient = axios.create({
 
 // Добавляем токен к каждому запросу
 apiClient.interceptors.request.use((config) => {
+  console.log('API Request Interceptor:', {
+    url: config.url,
+    method: config.method,
+    baseURL: config.baseURL,
+    fullURL: `${config.baseURL}${config.url}`,
+  })
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Token ${token}`
   }
   return config
+}, (error) => {
+  console.error('API Request Error:', error)
+  return Promise.reject(error)
 })
 
 // Обработка ошибок
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response Success:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data,
+    })
+    return response
+  },
   (error) => {
+    console.error('API Response Error:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      data: error.response?.data,
+      headers: error.response?.headers,
+    })
+    
     if (error.response?.status === 401) {
       // Токен недействителен - очищаем и перенаправляем на логин
       localStorage.removeItem('token')
