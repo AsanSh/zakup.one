@@ -4,25 +4,19 @@ import axios from 'axios'
 // Это решает проблемы с CORS и дизайном
 // В браузере всегда используем относительный путь (пустая строка = текущий домен и протокол)
 // Это гарантирует, что запросы будут использовать тот же протокол (HTTP/HTTPS), что и страница
-const getApiUrl = () => {
-  // В браузере всегда используем относительный путь
-  if (typeof window !== 'undefined') {
-    // Если VITE_API_URL задан и не пустой, используем его
-    // Но в production всегда используем относительный путь
-    const envUrl = import.meta.env.VITE_API_URL
-    if (envUrl && envUrl.trim() !== '' && import.meta.env.DEV) {
-      // Только в режиме разработки используем явный URL
-      return envUrl
-    }
-    // В production всегда используем относительный путь (пустая строка)
-    return ''
-  }
-  // На сервере (SSR) - не используется в нашем случае, но на всякий случай
-  return ''
-}
+
+// Получаем URL из переменной окружения, если она задана
+// В production VITE_API_URL должен быть пустым, чтобы использовать относительный путь
+const envApiUrl = import.meta.env.VITE_API_URL
+
+// В браузере всегда используем относительный путь, если envUrl пустой или не задан
+// Только в режиме разработки (локально) можно использовать явный URL
+const baseURL = (typeof window !== 'undefined' && (!envApiUrl || envApiUrl.trim() === '')) 
+  ? '' // Относительный путь в браузере
+  : (envApiUrl || '') // Используем envUrl если задан, иначе пустая строка
 
 export const apiClient = axios.create({
-  baseURL: getApiUrl(),
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
