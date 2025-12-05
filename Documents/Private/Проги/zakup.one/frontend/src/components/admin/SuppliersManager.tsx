@@ -69,7 +69,7 @@ export default function SuppliersManager() {
   const loadSuppliers = async () => {
     setLoading(true)
     try {
-      const res = await apiClient.get('/api/admin/suppliers/')
+      const res = await apiClient.get('/admin/suppliers/')
       setSuppliers(res.data.results || res.data || [])
     } catch (error) {
       console.error('Ошибка загрузки поставщиков:', error)

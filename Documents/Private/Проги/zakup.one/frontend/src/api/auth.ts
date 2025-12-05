@@ -20,7 +20,7 @@ export interface AuthResponse {
 
 export const authApi = {
   async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/auth/login/', {
+    const response = await apiClient.post<AuthResponse>('/auth/login/', {
       email,
       password,
     })
@@ -30,7 +30,7 @@ export const authApi = {
   async getCurrentUser(): Promise<User | null> {
     try {
       // Используем любой защищенный эндпоинт для проверки токена
-      const response = await apiClient.get('/api/orders/')
+      const response = await apiClient.get('/orders/')
       // Если запрос прошел, значит токен валиден
       // Но нам нужен пользователь, попробуем через другой эндпоинт
       // Или просто вернем null и заставим перелогиниться

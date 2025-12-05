@@ -36,14 +36,14 @@ export default function HomePage() {
     try {
       setLoading(true)
       // Загружаем рекомендованные товары
-      const recommendedResponse = await apiClient.get('/api/catalog/products/', {
+      const recommendedResponse = await apiClient.get('/catalog/products/', {
         params: { is_recommended: 'true' }
       })
       const recommended = recommendedResponse.data.results || recommendedResponse.data || []
       setRecommendedProducts(Array.isArray(recommended) ? recommended : [])
 
       // Загружаем акционные товары
-      const promotionalResponse = await apiClient.get('/api/catalog/products/', {
+      const promotionalResponse = await apiClient.get('/catalog/products/', {
         params: { is_promotional: 'true' }
       })
       const promotional = promotionalResponse.data.results || promotionalResponse.data || []

@@ -109,7 +109,7 @@ export default function OrdersPage() {
     try {
       setLoading(true)
       console.log('Начинаем загрузку заявок...')
-      const response = await apiClient.get('/api/orders/')
+      const response = await apiClient.get('/orders/')
       console.log('Полный ответ API:', response)
       console.log('Данные ответа:', response.data)
       console.log('Тип данных:', typeof response.data)

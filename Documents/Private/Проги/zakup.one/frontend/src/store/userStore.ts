@@ -65,7 +65,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
         if (token && user) {
           set({ user, token, initialized: true })
           // Проверяем валидность токена асинхронно
-          apiClient.get('/api/auth/me/')
+          apiClient.get('/auth/me/')
             .then((response) => {
               if (response.data) {
                 set({ user: response.data })

@@ -50,7 +50,7 @@ export default function ClientsManager() {
   const loadClients = async () => {
     setLoading(true)
     try {
-      const res = await apiClient.get('/api/auth/users/')
+      const res = await apiClient.get('/auth/users/')
       setClients(res.data.results || res.data || [])
     } catch (error) {
       console.error('Ошибка загрузки клиентов:', error)
@@ -62,7 +62,7 @@ export default function ClientsManager() {
   const loadCompanies = async () => {
     setLoading(true)
     try {
-      const res = await apiClient.get('/api/auth/companies/')
+      const res = await apiClient.get('/auth/companies/')
       setCompanies(res.data.results || res.data || [])
     } catch (error) {
       console.error('Ошибка загрузки компаний:', error)

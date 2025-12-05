@@ -69,15 +69,15 @@ export default function AdminDashboard() {
           // Данные загружаются в компоненте SuppliersManager
           break
         case 'products':
-          const productsRes = await apiClient.get('/api/catalog/products-admin/')
+          const productsRes = await apiClient.get('/catalog/products-admin/')
           setProducts(productsRes.data.results || productsRes.data || [])
           break
         case 'orders':
-          const ordersRes = await apiClient.get('/api/orders/orders-admin/')
+          const ordersRes = await apiClient.get('/orders/orders-admin/')
           setOrders(ordersRes.data.results || ordersRes.data || [])
           break
         case 'clients':
-          const clientsRes = await apiClient.get('/api/auth/users/')
+          const clientsRes = await apiClient.get('/auth/users/')
           setClients(clientsRes.data.results || clientsRes.data || [])
           break
       }
