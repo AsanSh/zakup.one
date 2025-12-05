@@ -38,24 +38,43 @@ const AuthLanding: React.FC = () => {
     setLoading(true)
 
     try {
+      console.log('Отправка запроса входа:', { email, password: '***' })
+      
       const response = await apiClient.post('/api/auth/login/', {
         email,
         password,
       })
 
+      console.log('Ответ от сервера:', response.data)
+
       if (response.data.token && response.data.user) {
+        console.log('Токен получен, сохранение данных пользователя')
         setToken(response.data.token)
         setUser(response.data.user)
 
         if (response.data.user.role === 'ADMIN') {
+          console.log('Роль ADMIN, переход в /admin')
           navigate('/admin', { replace: true })
         } else {
+          console.log('Роль CLIENT, переход в /customer')
           navigate('/customer', { replace: true })
         }
+      } else {
+        console.warn('Ответ не содержит token или user:', response.data)
+        setError('Ошибка входа. Неверный ответ от сервера.')
       }
     } catch (err: any) {
+      console.error('Ошибка входа:', err)
+      console.error('Детали ошибки:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message,
+      })
+      
       const errorMsg = err.response?.data?.error || 
                       err.response?.data?.detail || 
+                      err.message ||
                       'Ошибка входа. Проверьте email и пароль.'
       setError(errorMsg)
     } finally {
