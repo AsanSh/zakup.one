@@ -53,10 +53,26 @@ class RegisterView(APIView):
 
     def post(self, request):
         import logging
+        import sys
         logger = logging.getLogger(__name__)
         
-        logger.info(f'Registration request received. Data: {request.data}')
-        logger.info(f'Request headers: {dict(request.headers)}')
+        # Настраиваем логирование для вывода в консоль
+        if not logger.handlers:
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        
+        logger.info('=' * 50)
+        logger.info('REGISTRATION REQUEST RECEIVED')
+        logger.info(f'Method: {request.method}')
+        logger.info(f'Path: {request.path}')
+        logger.info(f'Data: {request.data}')
+        logger.info(f'Content-Type: {request.content_type}')
+        logger.info(f'Headers: {dict(request.headers)}')
+        logger.info('=' * 50)
         
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():

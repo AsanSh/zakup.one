@@ -62,7 +62,8 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, validators=[validate_password])
+    # Временно убираем валидацию пароля для диагностики - добавим обратно после исправления
+    password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
     company_name = serializers.CharField(write_only=True, required=False)
     company_phone = serializers.CharField(write_only=True, required=False)
@@ -73,8 +74,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ['email', 'password', 'password_confirm', 'full_name', 'company_name', 'company_phone', 'company_inn']
 
     def validate(self, attrs):
-        if attrs['password'] != attrs['password_confirm']:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'RegisterSerializer.validate called with attrs keys: {attrs.keys()}')
+        
+        if attrs.get('password') != attrs.get('password_confirm'):
+            logger.warning('Passwords do not match')
             raise serializers.ValidationError({'password': 'Пароли не совпадают'})
+        
+        # Проверяем минимальную длину пароля
+        if len(attrs.get('password', '')) < 8:
+            logger.warning('Password too short')
+            raise serializers.ValidationError({'password': 'Пароль должен содержать минимум 8 символов'})
+        
+        logger.info('Password validation passed')
         return attrs
 
     def create(self, validated_data):
