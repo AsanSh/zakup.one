@@ -44,7 +44,7 @@ export default function CartSummary() {
       console.log('Отправка заявки:', orderData)
       
       // Создаем заявку со всеми товарами - используем тот же endpoint, что и для чтения
-      const response = await apiClient.post('/api/orders/', orderData)
+      const response = await apiClient.post('/orders/', orderData)
 
       console.log('Заявка создана:', response.data)
       console.log('ID заявки:', response.data.id)

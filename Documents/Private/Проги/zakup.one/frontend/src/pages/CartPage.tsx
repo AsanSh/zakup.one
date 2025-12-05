@@ -27,7 +27,7 @@ export default function CartPage() {
       const formData = new FormData()
       formData.append('file', excelFile)
       
-      const response = await apiClient.post('/api/orders/parse-excel/', formData, {
+      const response = await apiClient.post('/orders/parse-excel/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -47,7 +47,7 @@ export default function CartPage() {
     if (!textInput.trim()) return
     
     try {
-      const response = await apiClient.post('/api/orders/parse-text/', {
+      const response = await apiClient.post('/orders/parse-text/', {
         text: textInput,
       })
       
@@ -69,7 +69,7 @@ export default function CartPage() {
       const formData = new FormData()
       formData.append('image', imageFile)
       
-      const response = await apiClient.post('/api/orders/parse-image/', formData, {
+      const response = await apiClient.post('/orders/parse-image/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

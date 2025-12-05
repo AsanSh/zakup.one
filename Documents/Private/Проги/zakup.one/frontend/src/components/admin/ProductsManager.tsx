@@ -124,7 +124,7 @@ export default function ProductsManager() {
       if (editingProduct) {
         await apiClient.patch(`/api/catalog/products-admin/${editingProduct.id}/`, data)
       } else {
-        await apiClient.post('/api/catalog/products-admin/', data)
+        await apiClient.post('/catalog/products-admin/', data)
       }
       setShowModal(false)
       setEditingProduct(null)

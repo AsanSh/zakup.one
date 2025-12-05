@@ -46,10 +46,10 @@ const AuthLanding: React.FC = () => {
 
     try {
       console.log('Отправка запроса входа:', { email, password: '***' })
-      console.log('API URL:', '/api/auth/login/')
+      console.log('API URL:', '/auth/login/')
       console.log('Request data:', { email, password: '***' })
       
-      const response = await apiClient.post('/api/auth/login/', {
+      const response = await apiClient.post('/auth/login/', {
         email,
         password,
       })
@@ -127,9 +127,9 @@ const AuthLanding: React.FC = () => {
         requestData.company_inn = companyInn.trim()
       }
       
-      console.log('Отправка запроса регистрации:', { url: '/api/auth/register/', data: { ...requestData, password: '***', password_confirm: '***' } })
+      console.log('Отправка запроса регистрации:', { url: '/auth/register/', data: { ...requestData, password: '***', password_confirm: '***' } })
       
-      const response = await apiClient.post('/api/auth/register/', requestData)
+      const response = await apiClient.post('/auth/register/', requestData)
       
       console.log('Ответ от сервера:', response.data)
 

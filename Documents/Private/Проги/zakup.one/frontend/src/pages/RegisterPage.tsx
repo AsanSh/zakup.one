@@ -64,7 +64,7 @@ export default function RegisterPage() {
         requestData.company_inn = formData.company_inn.trim()
       }
       
-      const response = await apiClient.post('/api/auth/register/', requestData)
+      const response = await apiClient.post('/auth/register/', requestData)
 
       // После регистрации НЕ логиним пользователя, а показываем сообщение
       if (response.data.message) {

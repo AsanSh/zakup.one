@@ -18,7 +18,7 @@ export default function VerifyEmailPage() {
 
     const verifyEmail = async () => {
       try {
-        const response = await apiClient.post('/api/auth/verify-email/', { token })
+        const response = await apiClient.post('/auth/verify-email/', { token })
         setStatus('success')
         setMessage(response.data.message || 'Email успешно подтвержден!')
       } catch (error: any) {

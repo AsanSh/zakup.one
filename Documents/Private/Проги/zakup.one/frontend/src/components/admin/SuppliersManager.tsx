@@ -134,7 +134,7 @@ export default function SuppliersManager() {
       if (editingSupplier) {
         await apiClient.patch(`/api/admin/suppliers/${editingSupplier.id}/`, data)
       } else {
-        await apiClient.post('/api/admin/suppliers/', data)
+        await apiClient.post('/admin/suppliers/', data)
       }
       setShowAddModal(false)
       setEditingSupplier(null)
@@ -196,7 +196,7 @@ export default function SuppliersManager() {
     uploadData.append('parsing_method', formData.get('parsing_method') as string)
 
     try {
-      const response = await apiClient.post('/api/admin/pricelists/upload/', uploadData, {
+      const response = await apiClient.post('/admin/pricelists/upload/', uploadData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       
