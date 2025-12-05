@@ -10,9 +10,10 @@ RUN npm install
 COPY frontend/ .
 
 # Сборка приложения
-ARG VITE_API_URL
-ENV VITE_API_URL=${VITE_API_URL}
-RUN npm run build
+# Явно задаем пустую строку для VITE_API_URL в production
+ARG VITE_API_URL=""
+ENV VITE_API_URL=""
+RUN VITE_API_URL="" npm run build
 
 # Production stage - nginx для раздачи статики
 FROM nginx:alpine
