@@ -54,22 +54,43 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            # Автоматически помечаем email как подтвержденный
-            user.email_verified = True
-            user.email_verification_token = None
-            user.save()
-            
-            # Отправляем письмо пользователю о том, что заявка отправлена администратору
-            send_registration_submitted_email(user)
-            
-            # Отправляем уведомление администратору
-            send_admin_notification_email(user)
-            
-            # НЕ создаем токен и НЕ логиним пользователя
-            return Response({
-                'message': 'Регистрация успешна! Ваша заявка отправлена администратору для рассмотрения. После одобрения вы сможете войти в систему.'
-            }, status=status.HTTP_201_CREATED)
+            try:
+                user = serializer.save()
+                # Автоматически помечаем email как подтвержденный
+                user.email_verified = True
+                user.email_verification_token = None
+                user.save()
+                
+                # Отправляем письмо пользователю о том, что заявка отправлена администратору
+                try:
+                    send_registration_submitted_email(user)
+                except Exception as e:
+                    # Логируем ошибку, но не прерываем регистрацию
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f'Ошибка отправки email пользователю {user.email}: {str(e)}')
+                
+                # Отправляем уведомление администратору
+                try:
+                    send_admin_notification_email(user)
+                except Exception as e:
+                    # Логируем ошибку, но не прерываем регистрацию
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f'Ошибка отправки уведомления администратору о регистрации {user.email}: {str(e)}')
+                
+                # НЕ создаем токен и НЕ логиним пользователя
+                return Response({
+                    'message': 'Регистрация успешна! Ваша заявка отправлена администратору для рассмотрения. После одобрения вы сможете войти в систему.'
+                }, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Логируем общую ошибку регистрации
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f'Ошибка при регистрации пользователя: {str(e)}', exc_info=True)
+                return Response({
+                    'error': 'Ошибка при создании аккаунта. Попробуйте еще раз.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
