@@ -99,17 +99,31 @@ const AuthLanding: React.FC = () => {
         requestData.company_inn = companyInn.trim()
       }
       
+      console.log('Отправка запроса регистрации:', { url: '/api/auth/register/', data: { ...requestData, password: '***', password_confirm: '***' } })
+      
       const response = await apiClient.post('/api/auth/register/', requestData)
+      
+      console.log('Ответ от сервера:', response.data)
 
       if (response.data.message) {
         setError('')
         setSuccess(true)
+        console.log('Регистрация успешна!')
       }
     } catch (err: any) {
+      console.error('Ошибка регистрации:', err)
+      console.error('Детали ошибки:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message,
+      })
+      
       const errorMessage = err.response?.data?.error || 
                           err.response?.data?.detail ||
                           (err.response?.data?.email ? err.response.data.email[0] : null) ||
                           (err.response?.data?.password ? err.response.data.password[0] : null) ||
+                          err.message ||
                           'Ошибка регистрации. Попробуйте еще раз.'
       setError(errorMessage)
     } finally {
