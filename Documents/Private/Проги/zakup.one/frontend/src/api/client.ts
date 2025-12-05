@@ -5,15 +5,10 @@ import axios from 'axios'
 // В браузере всегда используем относительный путь (пустая строка = текущий домен и протокол)
 // Это гарантирует, что запросы будут использовать тот же протокол (HTTP/HTTPS), что и страница
 
-// Получаем URL из переменной окружения, если она задана
-// В production VITE_API_URL должен быть пустым, чтобы использовать относительный путь
-const envApiUrl = import.meta.env.VITE_API_URL
-
-// В браузере всегда используем относительный путь, если envUrl пустой или не задан
-// Только в режиме разработки (локально) можно использовать явный URL
-const baseURL = (typeof window !== 'undefined' && (!envApiUrl || envApiUrl.trim() === '')) 
-  ? '' // Относительный путь в браузере
-  : (envApiUrl || '') // Используем envUrl если задан, иначе пустая строка
+// VITE_API_URL должен быть пустым в production для использования относительного пути
+// Vite заменяет import.meta.env.VITE_API_URL во время сборки
+// Если переменная пустая, Vite подставит пустую строку
+const baseURL = import.meta.env.VITE_API_URL || ''
 
 export const apiClient = axios.create({
   baseURL,
