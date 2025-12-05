@@ -45,15 +45,26 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const response = await apiClient.post('/api/auth/register/', {
+      // Формируем объект запроса, исключая пустые поля
+      const requestData: any = {
         email: formData.email,
         password: formData.password,
         password_confirm: formData.password_confirm,
-        full_name: formData.full_name,
-        company_name: formData.company_name || undefined,
-        company_phone: formData.company_phone || undefined,
-        company_inn: formData.company_inn || undefined,
-      })
+        full_name: formData.full_name || '',
+      }
+      
+      // Добавляем поля компании только если они заполнены
+      if (formData.company_name && formData.company_name.trim()) {
+        requestData.company_name = formData.company_name.trim()
+      }
+      if (formData.company_phone && formData.company_phone.trim()) {
+        requestData.company_phone = formData.company_phone.trim()
+      }
+      if (formData.company_inn && formData.company_inn.trim()) {
+        requestData.company_inn = formData.company_inn.trim()
+      }
+      
+      const response = await apiClient.post('/api/auth/register/', requestData)
 
       // После регистрации НЕ логиним пользователя, а показываем сообщение
       if (response.data.message) {

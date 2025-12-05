@@ -80,15 +80,26 @@ const AuthLanding: React.FC = () => {
     setLoading(true)
 
     try {
-      const response = await apiClient.post('/api/auth/register/', {
+      // Формируем объект запроса, исключая пустые поля
+      const requestData: any = {
         email,
         password,
         password_confirm: passwordConfirm,
-        full_name: fullName,
-        company_name: companyName || undefined,
-        company_phone: companyPhone || undefined,
-        company_inn: companyInn || undefined,
-      })
+        full_name: fullName || '',
+      }
+      
+      // Добавляем поля компании только если они заполнены
+      if (companyName && companyName.trim()) {
+        requestData.company_name = companyName.trim()
+      }
+      if (companyPhone && companyPhone.trim()) {
+        requestData.company_phone = companyPhone.trim()
+      }
+      if (companyInn && companyInn.trim()) {
+        requestData.company_inn = companyInn.trim()
+      }
+      
+      const response = await apiClient.post('/api/auth/register/', requestData)
 
       if (response.data.message) {
         setError('')
