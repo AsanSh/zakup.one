@@ -51,6 +51,19 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # Отключаем аутентификацию для регистрации
 
+    def dispatch(self, request, *args, **kwargs):
+        """Переопределяем dispatch для логирования всех запросов"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info('=' * 50)
+        logger.info('REGISTRATION REQUEST DISPATCH')
+        logger.info(f'Method: {request.method}')
+        logger.info(f'Path: {request.path}')
+        logger.info(f'Content-Type: {request.content_type}')
+        logger.info(f'Body: {request.body[:200] if hasattr(request, "body") else "No body"}')
+        logger.info('=' * 50)
+        return super().dispatch(request, *args, **kwargs)
+
     def post(self, request):
         import logging
         import sys
@@ -66,7 +79,7 @@ class RegisterView(APIView):
             logger.setLevel(logging.INFO)
         
         logger.info('=' * 50)
-        logger.info('REGISTRATION REQUEST RECEIVED')
+        logger.info('REGISTRATION REQUEST RECEIVED IN POST METHOD')
         logger.info(f'Method: {request.method}')
         logger.info(f'Path: {request.path}')
         logger.info(f'Data: {request.data}')
