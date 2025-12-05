@@ -20,12 +20,26 @@ export const apiClient = axios.create({
 
 // Добавляем токен к каждому запросу
 apiClient.interceptors.request.use((config) => {
+  // Убеждаемся, что URL начинается с /api/
+  if (config.url && !config.url.startsWith('/api/') && !config.url.startsWith('http')) {
+    console.warn('URL не начинается с /api/, исправляем:', config.url)
+    config.url = `/api${config.url}`
+  }
+  
+  // Формируем полный URL для логирования
+  const fullURL = config.baseURL 
+    ? (config.baseURL.endsWith('/') ? config.baseURL.slice(0, -1) : config.baseURL) + 
+      (config.url?.startsWith('/') ? config.url : '/' + config.url)
+    : config.url
+  
   console.log('API Request Interceptor:', {
     url: config.url,
     method: config.method,
     baseURL: config.baseURL,
-    fullURL: `${config.baseURL}${config.url}`,
+    fullURL: fullURL,
+    headers: config.headers,
   })
+  
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Token ${token}`
