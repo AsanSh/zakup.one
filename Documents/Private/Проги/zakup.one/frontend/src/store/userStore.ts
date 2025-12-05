@@ -86,7 +86,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const token = localStorage.getItem('token')
       if (token) {
         set({ token, initialized: true })
-        apiClient.get('/api/auth/me/')
+        apiClient.get('/auth/me/')
           .then((response) => {
             if (response.data) {
               set({ user: response.data })
