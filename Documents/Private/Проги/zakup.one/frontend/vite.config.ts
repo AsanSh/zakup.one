@@ -9,6 +9,27 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    // Proxy для development - проксируем запросы к Django backend
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path, // Не переписываем путь, оставляем /api/...
+      },
+      // Также проксируем прямые пути для совместимости
+      '/auth': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => `/api${path}`, // /auth/... -> /api/auth/...
+      },
+      '/admin': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 })
 

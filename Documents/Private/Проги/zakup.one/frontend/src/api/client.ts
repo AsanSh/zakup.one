@@ -9,6 +9,7 @@ import axios from 'axios'
 const envBaseURL = import.meta.env.VITE_API_URL || ''
 // В production (когда envBaseURL пустой) используем '/api'
 // В development можно использовать полный URL (например, 'http://localhost:8000/api')
+// ИЛИ оставить пустым и использовать Vite proxy (тогда тоже '/api')
 const baseURL = envBaseURL || '/api'
 
 console.log('🔵 API Client initialized:', {
