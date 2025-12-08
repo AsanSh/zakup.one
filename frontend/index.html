@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>ZAKUP.ONE</title>
+    <!-- Google Maps API -->
+    <!-- Замените YOUR_API_KEY на ваш реальный ключ Google Maps API -->
+    <!-- Получить ключ можно здесь: https://console.cloud.google.com/google/maps-apis -->
+    <!-- 
+      ВАЖНО: Замените YOUR_API_KEY на ваш реальный API ключ Google Maps
+      Или создайте файл .env в папке frontend/ с переменной:
+      VITE_GOOGLE_MAPS_API_KEY=ваш_ключ_здесь
+    -->
+    <script>
+      // Функция для загрузки Google Maps API
+      function loadGoogleMaps() {
+        // Пытаемся получить ключ из переменной окружения (будет доступна после сборки)
+        // Для разработки можно установить напрямую здесь или через .env
+        const apiKey = 'YOUR_API_KEY'; // Замените на ваш ключ
+        
+        if (apiKey && apiKey !== 'YOUR_API_KEY') {
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+          script.async = true;
+          script.defer = true;
+          script.onerror = function() {
+            console.error('Ошибка загрузки Google Maps API. Проверьте API ключ и настройки.');
+            window.googleMapsError = true;
+          };
+          document.head.appendChild(script);
+        } else {
+          console.warn('Google Maps API ключ не установлен. Карта не будет работать.');
+          window.googleMapsError = true;
+        }
+      }
+      
+      // Загружаем после загрузки страницы
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadGoogleMaps);
+      } else {
+        loadGoogleMaps();
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
