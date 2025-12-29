@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
-import apiClient from '../api/client'
 
-// Конвертируем единицы измерения в маленькие буквы
 const unitMap: Record<string, string> = {
   'M': 'м',
   'КГ': 'кг',
@@ -16,26 +14,30 @@ const unitMap: Record<string, string> = {
 
 export default function CartSummary() {
   const navigate = useNavigate()
-  const { items, removeItem, updateQuantity, clear, getTotalAmount, getTotalItems } = useCartStore()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { items, removeItem, updateQuantity, getTotalAmount, getTotalItems } = useCartStore()
   const [isExpanded, setIsExpanded] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const previousItemsCount = useRef(items.length)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const totalAmount = getTotalAmount()
   const totalItems = getTotalItems()
 
-  // Отладочная информация
-  console.log('CartSummary: items count =', items.length, 'items =', items)
-
-  // Анимация при добавлении товара
   useEffect(() => {
     if (items.length > previousItemsCount.current) {
-      // Товар был добавлен
       setShouldAnimate(true)
       const timer = setTimeout(() => {
         setShouldAnimate(false)
-      }, 2000) // Анимация длится 2 секунды
+      }, 2000)
       return () => clearTimeout(timer)
     }
     previousItemsCount.current = items.length
@@ -43,57 +45,20 @@ export default function CartSummary() {
 
   const displayUnit = (unit: string) => unitMap[unit] || unit.toLowerCase()
 
-  const handleSubmitOrder = async () => {
-    if (items.length === 0) return
-
-    setIsSubmitting(true)
-    try {
-      const orderData = {
-        delivery_address: '',
-        items: items.map(item => ({
-          product_id: item.product_id,
-          quantity: String(item.quantity), // DecimalField требует строку
-        }))
-      }
-      
-      console.log('Отправка заявки:', orderData)
-      
-      // Создаем заявку со всеми товарами - используем тот же endpoint, что и для чтения
-      const response = await apiClient.post('/api/orders/', orderData)
-
-      console.log('Заявка создана:', response.data)
-      console.log('ID заявки:', response.data.id)
-      console.log('Номер заявки:', response.data.order_number)
-
-      // Очищаем корзину
-      clear()
-      
-      // Показываем сообщение и переходим к заявкам
-      alert('✅ Заявка отправлена!')
-      
-      // Переходим к заявкам
-      navigate('/orders')
-    } catch (error: any) {
-      console.error('Ошибка создания заявки:', error)
-      console.error('Детали ошибки:', error?.response?.data)
-      const errorMessage = error?.response?.data?.detail || 
-                          error?.response?.data?.message || 
-                          error?.response?.data?.error ||
-                          'Ошибка при отправке заявки'
-      alert(`Ошибка: ${errorMessage}`)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   if (items.length === 0) {
     return null
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-200 shadow-2xl z-50">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-        {/* Заголовок корзины */}
+    <div 
+      className="fixed left-0 right-0 bg-white border-t-2 border-blue-200 shadow-2xl z-40 lg:z-50" 
+      style={{ 
+        bottom: isMobile ? '64px' : '0',
+        paddingBottom: 'env(safe-area-inset-bottom, 0)' 
+      }}
+    >
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+        {/* Header */}
         <div className="py-3 sm:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             <div className="relative flex-shrink-0">
@@ -107,18 +72,18 @@ export default function CartSummary() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 truncate">
-                <span className="text-blue-600">{totalItems}</span> {totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров'} на <span className="text-blue-600 font-bold text-sm sm:text-base lg:text-lg">{totalAmount.toLocaleString('ru-RU')} сом</span>
+              <div className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900">
+                <span className="text-blue-600">{totalItems}</span> {totalItems === 1 ? 'товар' : totalItems < 5 ? 'товара' : 'товаров'} на{' '}
+                <span className="text-blue-600 font-bold text-sm sm:text-base lg:text-lg">
+                  {totalAmount.toLocaleString('ru-RU')} сом
+                </span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsExpanded(!isExpanded)
-              }}
-              className={`px-4 py-2 text-sm rounded-md transition-all duration-300 flex items-center gap-1.5 relative ${
+              onClick={() => setIsExpanded(!isExpanded)}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg transition-all duration-300 flex items-center gap-1.5 ${
                 shouldAnimate 
                   ? 'animate-bounce bg-blue-100 text-blue-700 font-semibold shadow-lg ring-2 ring-blue-300' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -126,7 +91,7 @@ export default function CartSummary() {
             >
               <span className={shouldAnimate ? 'animate-pulse' : ''}>Детали</span>
               <svg 
-                className={`w-5 h-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} ${
+                className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} ${
                   shouldAnimate ? 'animate-pulse text-blue-600' : ''
                 }`}
                 fill="none" 
@@ -135,36 +100,30 @@ export default function CartSummary() {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
               </svg>
-              {shouldAnimate && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></span>
-              )}
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleSubmitOrder()
-              }}
-              disabled={isSubmitting}
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md"
+              onClick={() => navigate('/cart')}
+              className="px-4 sm:px-6 py-2 sm:py-2.5 bg-blue-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md"
             >
-              {isSubmitting ? 'Отправка...' : 'Оформить заявку'}
+              Оформить
             </button>
           </div>
         </div>
 
-        {/* Раскрывающийся список товаров */}
+        {/* Expanded Items List */}
         {isExpanded && (
-          <div className="border-t border-gray-200 py-4 max-h-64 overflow-y-auto">
+          <div className="border-t border-gray-200 py-3 sm:py-4 max-h-64 overflow-y-auto">
             <div className="space-y-2">
               {items.map((item) => (
-                <div key={item.product_id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                <div key={item.product_id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
                     <div className="text-xs text-gray-500">
-                      {Number(item.price).toLocaleString('ru-RU')} сом × {item.quantity} {displayUnit(item.unit)} = {(item.price * item.quantity).toLocaleString('ru-RU')} сом
+                      {Number(item.price).toLocaleString('ru-RU')} сом × {item.quantity} {displayUnit(item.unit)} ={' '}
+                      {(item.price * item.quantity).toLocaleString('ru-RU')} сом
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="flex items-center gap-1 border border-gray-300 rounded">
                       <button
                         onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
@@ -175,7 +134,7 @@ export default function CartSummary() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                         </svg>
                       </button>
-                      <span className="px-2 py-1 text-sm text-gray-900 min-w-[3rem] text-center">
+                      <span className="px-2 py-1 text-sm text-gray-900 min-w-[2.5rem] text-center">
                         {item.quantity}
                       </span>
                       <button
@@ -189,7 +148,7 @@ export default function CartSummary() {
                     </div>
                     <button
                       onClick={() => removeItem(item.product_id)}
-                      className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
                       title="Удалить"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

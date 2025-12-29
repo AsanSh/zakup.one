@@ -1,11 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import OrderViewSet, OrderListView, OrderCreateView, OrderDetailView, OrderDeleteView, OrderParseTextView, OrderParseExcelView, OrderParseImageView
+from .views import OrderViewSet, OrderListView, OrderCreateView, OrderDetailView, OrderDeleteView, OrderParseTextView, OrderParseExcelView, OrderParseImageView, InvoiceViewSet, DeliveryTrackingViewSet
 
 # ViewSet для основных операций (создание, чтение, обновление, удаление)
 router = DefaultRouter()
 router.register(r'', OrderViewSet, basename='order')  # Регистрируем на корне /api/orders/
 router.register(r'orders-admin', OrderViewSet, basename='order-admin')  # Для админки
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'tracking', DeliveryTrackingViewSet, basename='tracking')
 
 app_name = 'orders'
 

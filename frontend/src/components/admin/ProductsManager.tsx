@@ -12,9 +12,10 @@ interface Product {
   is_active: boolean
   is_recommended: boolean
   is_promotional: boolean
-  base_price: number
+  base_price: number  // Цена поставщика (для админа)
+  price: number  // API возвращает base_price как price для админа
   markup_percent: number
-  final_price: number
+  final_price: number  // Итоговая цена с наценкой (для справки)
 }
 
 interface Supplier {
@@ -233,10 +234,10 @@ export default function ProductsManager() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div>
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="flex items-center gap-4">
           <h3 className="text-xl font-semibold text-gray-900">Товары</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 whitespace-nowrap">
             Всего товаров: <span className="font-semibold text-gray-700">{totalCount}</span>
             {selectedProducts.size > 0 && (
               <span className="ml-3">
@@ -245,7 +246,7 @@ export default function ProductsManager() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-md flex-wrap">
+        <div className="flex items-center gap-3 flex-1 justify-end">
           <select
             value={selectedSupplier || ''}
             onChange={(e) => setSelectedSupplier(e.target.value ? Number(e.target.value) : null)}
@@ -263,35 +264,33 @@ export default function ProductsManager() {
             placeholder="Поиск товаров..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm min-w-[200px]"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm min-w-[200px]"
           />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1"
-              title={sortOrder === 'asc' ? 'По убыванию' : 'По возрастанию'}
-            >
-              <span>А-Я</span>
-              {sortOrder === 'asc' ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setEditingProduct(null)
-                setShowModal(true)
-              }}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
-            >
-              + Добавить товар
-            </button>
-          </div>
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1 whitespace-nowrap"
+            title={sortOrder === 'asc' ? 'По убыванию' : 'По возрастанию'}
+          >
+            <span>А-Я</span>
+            {sortOrder === 'asc' ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setEditingProduct(null)
+              setShowModal(true)
+            }}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+          >
+            + Добавить товар
+          </button>
         </div>
       </div>
 
@@ -379,8 +378,8 @@ export default function ProductsManager() {
           <p className="text-gray-500">Товары не найдены</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm">
-          <table className="w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
+        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+          <table className="w-full divide-y divide-gray-200 min-w-[800px]">
             <colgroup>
               <col style={{ width: '3%' }} />
               <col style={{ width: '17%' }} />
@@ -405,14 +404,14 @@ export default function ProductsManager() {
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Артикул</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Поставщик</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Прайс поставщика</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Наценка (сом)</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Продажная цена</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Метки</th>
-                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Название</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Артикул</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Поставщик</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Прайс поставщика</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Наценка (сом)</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Продажная цена</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Метки</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Действия</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -429,9 +428,9 @@ export default function ProductsManager() {
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </td>
-                  <td className="px-2 py-2 text-xs text-gray-900 truncate" title={product.name}>{product.name}</td>
-                  <td className="px-2 py-2 text-xs text-gray-600 truncate">{product.article}</td>
-                  <td className="px-2 py-2 text-xs text-gray-600 truncate">{product.supplier?.name || '-'}</td>
+                  <td className="px-2 py-2 text-xs text-gray-900 truncate max-w-[150px]" title={product.name}>{product.name}</td>
+                  <td className="px-2 py-2 text-xs text-gray-600 truncate max-w-[100px]" title={product.article}>{product.article}</td>
+                  <td className="px-2 py-2 text-xs text-gray-600 truncate max-w-[120px]" title={product.supplier?.name || '-'}>{product.supplier?.name || '-'}</td>
                   <td className="px-2 py-2 text-xs text-gray-900 whitespace-nowrap">{Number(product.base_price).toLocaleString('ru-RU')} сом</td>
                   <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
                     {product.supplier?.markup_som 
@@ -456,7 +455,7 @@ export default function ProductsManager() {
                     </div>
                   </td>
                   <td className="px-2 py-2 text-xs">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap">
                       <button
                         onClick={() => {
                           setEditingProduct(product)

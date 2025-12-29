@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.viewsets import ModelViewSet
-from .models import Order, OrderItem
-from .serializers import OrderSerializer, OrderCreateSerializer, OrderUpdateSerializer
+from .models import Order, OrderItem, Invoice, DeliveryTracking
+from .serializers import OrderSerializer, OrderCreateSerializer, OrderUpdateSerializer, InvoiceSerializer, DeliveryTrackingSerializer
 
 
 class OrderViewSet(ModelViewSet):
@@ -140,6 +140,129 @@ class OrderParseImageView(APIView):
     def post(self, request):
         # TODO: Реализовать OCR обработку изображения
         return Response({'message': 'Функция в разработке'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+
+class InvoiceViewSet(ModelViewSet):
+    serializer_class = InvoiceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return Invoice.objects.all()
+        return Invoice.objects.filter(order__client=user)
+
+
+class DeliveryTrackingViewSet(ModelViewSet):
+    serializer_class = DeliveryTrackingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Права доступа
+        if user.role == 'ADMIN':
+            queryset = DeliveryTracking.objects.select_related('order').all()
+        else:
+            queryset = DeliveryTracking.objects.select_related('order').filter(order__client=user)
+        
+        # Фильтр по order_id из query params
+        order_id = self.request.query_params.get('order', None)
+        if order_id:
+            try:
+                queryset = queryset.filter(order_id=int(order_id))
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        """Переопределяем list для обработки случая когда трекинг не найден, но заказ существует"""
+        order_id = request.query_params.get('order', None)
+        
+        if order_id:
+            try:
+                order_id_int = int(order_id)
+                # Проверяем, существует ли заказ
+                try:
+                    order = Order.objects.get(id=order_id_int)
+                    
+                    # Проверяем права доступа
+                    if request.user.role != 'ADMIN' and order.client != request.user:
+                        return Response(
+                            {'error': 'Доступ запрещен'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                    
+                    # Проверяем подписку пользователя (трекинг доступен только для Стандарт и VIP)
+                    from apps.users.models import UserSubscription
+                    subscription = UserSubscription.objects.filter(
+                        user=order.client,
+                        status='ACTIVE'
+                    ).select_related('plan').first()
+                    
+                    # Проверяем наличие активной подписки с доступом к трекингу
+                    has_tracking_access = (subscription and 
+                                         subscription.is_active and 
+                                         subscription.plan.delivery_tracking_available)
+                    
+                    if not has_tracking_access:
+                        # Подписка не позволяет трекинг (Базовый тариф или нет подписки)
+                        plan_name = subscription.plan.name if subscription and subscription.plan else 'Базовый'
+                        return Response({
+                            'locked': True,
+                            'reason': f'Трекинг доступен только для тарифов Стандарт и VIP. Ваш тариф: {plan_name}',
+                            'order': {
+                                'id': order.id,
+                                'order_number': order.order_number,
+                                'status': order.status,
+                                'status_label': dict(Order.STATUS_CHOICES).get(order.status, order.status)
+                            }
+                        })
+                    
+                    # Подписка позволяет трекинг - проверяем наличие трекинга
+                    tracking = DeliveryTracking.objects.filter(order_id=order_id_int).first()
+                    
+                    if not tracking:
+                        # Трекинг не создан - создаем его
+                        tracking = DeliveryTracking.objects.create(
+                            order=order,
+                            status='ACCEPTED',
+                            items_count=order.items.count()
+                        )
+                        return Response(DeliveryTrackingSerializer(tracking).data)
+                    
+                    # Трекинг существует - возвращаем его
+                    return Response(DeliveryTrackingSerializer(tracking).data)
+                    
+                except Order.DoesNotExist:
+                    return Response(
+                        {'error': 'Заказ не найден'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'Неверный ID заказа'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Если order_id не передан, возвращаем стандартный список
+        return super().list(request, *args, **kwargs)
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """Обновить статус доставки (только для админов)"""
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
+        
+        tracking = self.get_object()
+        new_status = request.data.get('status')
+        
+        if new_status not in dict(DeliveryTracking.STATUS_CHOICES):
+            return Response({'error': 'Неверный статус'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        tracking.update_status(new_status, operator=request.user)
+        return Response(DeliveryTrackingSerializer(tracking).data)
 
 
 

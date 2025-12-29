@@ -46,6 +46,7 @@ export default function SuppliersManager() {
   const [selectedFileName, setSelectedFileName] = useState<string>('')
   const [editingMarkupId, setEditingMarkupId] = useState<number | null>(null)
   const [editingMarkupValue, setEditingMarkupValue] = useState<string>('')
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     loadSuppliers()
@@ -137,16 +138,52 @@ export default function SuppliersManager() {
 
   const handleMarkupSave = async (supplierId: number) => {
     try {
-      const value = parseFloat(editingMarkupValue) || 0
+      // Заменяем запятую на точку для правильного парсинга
+      const cleanValue = editingMarkupValue.replace(',', '.')
+      const value = parseFloat(cleanValue)
+      
+      if (isNaN(value)) {
+        alert('Введите корректное числовое значение')
+        return
+      }
+      
+      if (value < 0) {
+        alert('Наценка не может быть отрицательной')
+        return
+      }
+      
       await apiClient.patch(`/api/admin/suppliers/${supplierId}/`, {
         markup_som: value
       })
+      
       setEditingMarkupId(null)
       setEditingMarkupValue('')
       loadSuppliers()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка сохранения наценки:', error)
-      alert('Ошибка при сохранении наценки')
+      
+      // Показываем детальную ошибку
+      let errorMsg = 'Ошибка при сохранении наценки'
+      if (error?.response?.data) {
+        const errorData = error.response.data
+        if (errorData.markup_som) {
+          errorMsg = `Ошибка валидации наценки: ${Array.isArray(errorData.markup_som) ? errorData.markup_som.join(', ') : errorData.markup_som}`
+        } else if (errorData.error) {
+          errorMsg = errorData.error
+        } else if (typeof errorData === 'object') {
+          const fieldErrors = Object.keys(errorData).map(key => {
+            const fieldError = errorData[key]
+            return Array.isArray(fieldError) ? fieldError.join(', ') : String(fieldError)
+          }).join('\n')
+          if (fieldErrors) {
+            errorMsg = `Ошибки валидации:\n${fieldErrors}`
+          }
+        }
+      } else if (error?.message) {
+        errorMsg = error.message
+      }
+      
+      alert(errorMsg)
     }
   }
 
@@ -237,6 +274,64 @@ export default function SuppliersManager() {
     }
   }
 
+  // Обработка выбранного файла (из input или drag & drop)
+  const handleFileSelect = (file: File | null) => {
+    if (!file) {
+      setSelectedFileName('')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Проверяем расширение файла
+    const validExtensions = ['.xlsx', '.xls', '.csv', '.pdf']
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    
+    if (!validExtensions.includes(fileExtension)) {
+      setPriceListError(`Неподдерживаемый формат файла. Разрешены: ${validExtensions.join(', ')}`)
+      setSelectedFileName('')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    setSelectedFileName(file.name)
+    setPriceListError(null)
+    
+    // Устанавливаем файл в input для совместимости с формой
+    if (fileInputRef.current) {
+      const dataTransfer = new DataTransfer()
+      dataTransfer.items.add(file)
+      fileInputRef.current.files = dataTransfer.files
+    }
+  }
+
+  // Обработчики drag and drop
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      handleFileSelect(files[0])
+    }
+  }
+
   const handleUploadPriceList = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setPriceListError(null)
@@ -269,10 +364,7 @@ export default function SuppliersManager() {
       
       // НЕ закрываем модальное окно - показываем статус обработки
       // Пользователь сам закроет окно после завершения обработки
-      setSelectedFileName('')
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      handleFileSelect(null)
     } catch (error: any) {
       console.error('Ошибка загрузки прайс-листа:', error)
       
@@ -652,6 +744,8 @@ export default function SuppliersManager() {
                   setShowPriceListModal(false)
                   setSelectedSupplier(null)
                   setPriceListError(null)
+                  handleFileSelect(null)
+                  setIsDragging(false)
                 }}
                 className="text-gray-400 hover:text-gray-600"
                 title="Закрыть"
@@ -670,8 +764,22 @@ export default function SuppliersManager() {
             
             <form onSubmit={handleUploadPriceList} className="mb-6">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Файл прайс-листа *</label>
-                <div className="flex gap-2 items-center">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Файл прайс-листа *</label>
+                
+                {/* Drag and Drop зона */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`
+                    relative border-2 border-dashed rounded-lg p-8 text-center transition-colors
+                    ${isDragging 
+                      ? 'border-indigo-500 bg-indigo-50' 
+                      : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                    }
+                    ${selectedFileName ? 'border-green-400 bg-green-50' : ''}
+                  `}
+                >
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -682,31 +790,53 @@ export default function SuppliersManager() {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0]
-                      if (file) {
-                        setSelectedFileName(file.name)
-                      } else {
-                        setSelectedFileName('')
-                      }
+                      handleFileSelect(file || null)
                     }}
                   />
-                  <label
-                    htmlFor="price-list-file-input"
-                    onClick={(e) => {
-                      // Гарантируем открытие диалогового окна
-                      e.preventDefault()
-                      if (fileInputRef.current) {
-                        fileInputRef.current.click()
-                      }
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 bg-white transition-colors font-medium cursor-pointer inline-block select-none"
-                    style={{ userSelect: 'none' }}
-                  >
-                    Выберите файл
-                  </label>
-                  {selectedFileName && (
-                    <span className="px-3 py-2 text-sm text-gray-600 flex items-center">
-                      {selectedFileName}
-                    </span>
+                  
+                  {selectedFileName ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center">
+                        <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-700">{selectedFileName}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleFileSelect(null)}
+                        className="text-xs text-red-600 hover:text-red-800 underline"
+                      >
+                        Удалить файл
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center">
+                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">
+                          Перетащите файл сюда или
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            fileInputRef.current?.click()
+                          }}
+                          className="text-sm font-medium text-indigo-600 hover:text-indigo-800 underline"
+                        >
+                          выберите файл
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Поддерживаемые форматы: .xlsx, .xls, .csv, .pdf
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -732,10 +862,8 @@ export default function SuppliersManager() {
                     setShowPriceListModal(false)
                     setSelectedSupplier(null)
                     setPriceListError(null)
-                    setSelectedFileName('')
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = ''
-                    }
+                    handleFileSelect(null)
+                    setIsDragging(false)
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
                 >

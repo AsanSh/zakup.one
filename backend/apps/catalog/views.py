@@ -7,7 +7,7 @@ from rest_framework.viewsets import ModelViewSet
 from django.db import models
 from apps.users.permissions import IsAdminRole
 from .models import Product, Category
-from .serializers import ProductSerializer, ProductCreateUpdateSerializer, CategorySerializer
+from .serializers import ProductSerializer, ProductAdminSerializer, ProductCreateUpdateSerializer, CategorySerializer
 
 
 class ProductViewSet(ModelViewSet):
@@ -16,7 +16,8 @@ class ProductViewSet(ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ProductCreateUpdateSerializer
-        return ProductSerializer
+        # Для админа используем ProductAdminSerializer (показывает base_price)
+        return ProductAdminSerializer
 
     def get_queryset(self):
         # По умолчанию показываем только активные товары (как для клиентов)
@@ -74,8 +75,8 @@ class ProductViewSet(ModelViewSet):
 
 
 class ProductListView(ListAPIView):
-    """Публичный список товаров для клиентов"""
-    serializer_class = ProductSerializer
+    """Публичный список товаров для клиентов (показывает final_price - цена с наценкой)"""
+    serializer_class = ProductSerializer  # Для клиентов используем ProductSerializer (показывает final_price)
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -117,6 +118,7 @@ class ProductSearchView(APIView):
             models.Q(name__icontains=query) | models.Q(article__icontains=query)
         )[:10]
         
+        # Для поиска клиентов используем ProductSerializer (показывает final_price)
         serializer = ProductSerializer(products, many=True)
         return Response({'results': serializer.data})
 

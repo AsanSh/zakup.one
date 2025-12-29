@@ -1,10 +1,20 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import LoginView, RegisterView, VerifyEmailView, CurrentUserView, UserListView, UserViewSet, CompanyViewSet
+from .views import (
+    LoginView, RegisterView, VerifyEmailView, CurrentUserView, UserListView,
+    UserViewSet, CompanyViewSet, SavedCompanyViewSet, SavedAddressViewSet,
+    SavedRecipientViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, UserCompanyViewSet
+)
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'companies', CompanyViewSet, basename='company')
+router.register(r'saved-companies', SavedCompanyViewSet, basename='saved-company')
+router.register(r'saved-addresses', SavedAddressViewSet, basename='saved-address')
+router.register(r'saved-recipients', SavedRecipientViewSet, basename='saved-recipient')
+router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscription-plan')
+router.register(r'subscriptions', UserSubscriptionViewSet, basename='subscription')
+router.register(r'user-companies', UserCompanyViewSet, basename='user-company')
 
 app_name = 'users'
 

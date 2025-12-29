@@ -85,14 +85,21 @@ export default function OrdersManager() {
         </select>
       </div>
 
-      {/* Блоки по статусам */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      {/* Блоки по статусам - вертикально, одна карточка на строку */}
+      <div className="space-y-4 mb-6">
         {(Object.keys(STATUS_GROUPS) as Array<keyof typeof STATUS_GROUPS>).map((groupKey) => {
           const group = STATUS_GROUPS[groupKey]
           const groupOrders = getOrdersByGroup(groupKey)
+          const colorClasses = {
+            blue: 'text-blue-600',
+            yellow: 'text-yellow-600',
+            purple: 'text-purple-600',
+            green: 'text-green-600',
+            red: 'text-red-600',
+          }
           return (
-            <div key={groupKey} className="bg-white rounded-lg shadow-sm p-4">
-              <h4 className={`text-lg font-semibold mb-3 text-${group.color}-600`}>
+            <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h4 className={`text-base font-semibold mb-3 ${colorClasses[group.color as keyof typeof colorClasses]}`}>
                 {group.label} ({groupOrders.length})
               </h4>
               {groupOrders.length === 0 ? (
@@ -102,9 +109,9 @@ export default function OrdersManager() {
                   {groupOrders.slice(0, 5).map((order) => (
                     <div key={order.id} className="border rounded p-2 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-sm">{order.order_number || `#${order.id}`}</div>
-                          <div className="text-xs text-gray-500">{order.client.email}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm truncate">{order.order_number || `#${order.id}`}</div>
+                          <div className="text-xs text-gray-500 truncate">{order.client.email}</div>
                           <div className="text-xs font-semibold mt-1">
                             {Number(order.total_amount).toLocaleString('ru-RU')} сом
                           </div>
@@ -112,7 +119,7 @@ export default function OrdersManager() {
                         <select
                           value={order.status}
                           onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                          className="text-xs border rounded px-2 py-1"
+                          className="text-xs border rounded px-2 py-1 ml-2 flex-shrink-0"
                         >
                           <option value="NEW">Новая</option>
                           <option value="IN_PROGRESS">В обработке</option>

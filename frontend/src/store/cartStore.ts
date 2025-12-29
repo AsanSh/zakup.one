@@ -3,9 +3,15 @@ import { create } from 'zustand'
 export interface CartItem {
   product_id: number
   name: string
+  article?: string
   unit: string
   quantity: number
   price: number
+  image_url?: string
+  supplier?: {
+    id: number
+    name: string
+  }
 }
 
 interface CartStore {

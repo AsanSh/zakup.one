@@ -23,6 +23,7 @@ class SupplierSerializer(serializers.ModelSerializer):
 class SupplierCreateUpdateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     website = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    markup_som = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = Supplier
@@ -38,6 +39,12 @@ class SupplierCreateUpdateSerializer(serializers.ModelSerializer):
     def validate_website(self, value):
         if value == '':
             return None
+        return value
+    
+    def validate_markup_som(self, value):
+        """Валидация наценки - должна быть неотрицательной"""
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Наценка не может быть отрицательной")
         return value
 
 

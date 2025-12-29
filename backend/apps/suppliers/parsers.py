@@ -271,34 +271,55 @@ class ExcelPriceListParser:
                 unit_col = None
                 price_col = None
                 
+                # Расширенный список вариантов для названия товара
+                name_keywords = [
+                    'товар', 'наименование', 'название', 'наименование товара',
+                    'название товара', 'наименование продукции', 'продукт', 'изделие',
+                    'материал', 'позиция', 'артикул', 'описание'
+                ]
+                
                 # Ищем колонку с названием товара
                 for idx, val in enumerate(header):
                     val_str = str(val).strip().lower() if pd.notna(val) else ''
-                    if val_str in ['товар', 'наименование', 'название', 'наименование товара']:
+                    if any(keyword in val_str for keyword in name_keywords):
                         product_col = idx
                         break
+                
+                # Расширенный список вариантов для единицы измерения
+                unit_keywords = [
+                    'ед.изм', 'ед изм', 'единица измерения', 'ед', 'единица',
+                    'ед. изм', 'ед.изм.', 'единица', 'измерения', 'размерность'
+                ]
                 
                 # Ищем колонку с единицей измерения
                 for idx, val in enumerate(header):
                     val_str = str(val).strip().lower() if pd.notna(val) else ''
-                    if val_str in ['ед.изм', 'ед изм', 'единица измерения', 'ед', 'единица']:
+                    if any(keyword in val_str for keyword in unit_keywords):
                         unit_col = idx
                         break
+                
+                # Расширенный список вариантов для цены
+                price_keywords = [
+                    'цена', 'цена продажи', 'цена за единицу', 'стоимость',
+                    'цена, руб', 'цена руб', 'цена (руб)', 'цена, сом', 'цена сом',
+                    'цена (сом)', 'розничная цена', 'оптовая цена', 'цена без ндс',
+                    'цена с ндс', 'сумма', 'стоимость, руб', 'стоимость, сом'
+                ]
                 
                 # Ищем колонку с ценой
                 for idx, val in enumerate(header):
                     val_str = str(val).strip().lower() if pd.notna(val) else ''
-                    if val_str in ['цена', 'цена продажи', 'цена за единицу', 'стоимость']:
+                    if any(keyword in val_str for keyword in price_keywords):
                         price_col = idx
                         break
                 
                 if product_col is None or unit_col is None or price_col is None:
-                    raise IndexError("Не все колонки найдены")
+                    raise IndexError("Не все колонки найдены по заголовкам")
                     
             except (IndexError, KeyError):
-                # Если не нашли точные заголовки, пробуем найти по ключевым словам
-                logger.warning("Не найдены точные заголовки. Пробуем найти по ключевым словам.")
-                product_col, unit_col, price_col = self._find_columns_by_keywords(df, header_row)
+                # Если не нашли точные заголовки, пробуем найти по ключевым словам и содержимому
+                logger.warning("Не найдены точные заголовки. Пробуем умный поиск колонок.")
+                product_col, unit_col, price_col = self._find_columns_smart(df, header_row)
             
             logger.info(f"Колонки: Товар={product_col}, Ед.изм={unit_col}, Цена={price_col}")
             
@@ -355,6 +376,135 @@ class ExcelPriceListParser:
                     return idx
         
         return None
+    
+    def _find_columns_smart(self, df: pd.DataFrame, header_row: int) -> tuple:
+        """
+        Умный поиск колонок на основе анализа заголовков и содержимого данных
+        
+        Алгоритм:
+        1. Анализирует заголовки (если есть)
+        2. Анализирует содержимое первых 20 строк данных для определения типов колонок
+        3. Колонка с названиями: содержит текстовые значения длиной > 3 символов
+        4. Колонка с ценами: содержит числовые значения > 0
+        5. Колонка с единицами: содержит короткие текстовые значения (шт, м, кг и т.д.)
+        """
+        product_col = None
+        unit_col = None
+        price_col = None
+        
+        # Сначала пробуем найти по заголовкам
+        if header_row < len(df):
+            header = df.iloc[header_row]
+            
+            # Расширенные варианты поиска в заголовках
+            name_keywords = ['товар', 'наименование', 'название', 'продукт', 'материал', 'позиция', 'артикул', 'описание']
+            unit_keywords = ['ед', 'изм', 'единиц', 'размерност']
+            price_keywords = ['цена', 'стоимость', 'сумма', 'руб', 'сом']
+            
+            for idx, val in enumerate(header):
+                if pd.notna(val):
+                    val_str = str(val).strip().lower()
+                    if product_col is None and any(kw in val_str for kw in name_keywords):
+                        product_col = idx
+                    if unit_col is None and any(kw in val_str for kw in unit_keywords):
+                        unit_col = idx
+                    if price_col is None and any(kw in val_str for kw in price_keywords):
+                        price_col = idx
+        
+        # Если не нашли все колонки по заголовкам, анализируем содержимое данных
+        data_start = header_row + 1
+        data_end = min(data_start + 20, len(df))  # Анализируем первые 20 строк данных
+        
+        if data_start < len(df):
+            # Анализируем каждую колонку
+            column_scores = {
+                'name': {},  # Оценка вероятности быть колонкой с названиями
+                'unit': {},  # Оценка вероятности быть колонкой с единицами
+                'price': {}  # Оценка вероятности быть колонкой с ценами
+            }
+            
+            for col_idx in range(len(df.columns)):
+                name_score = 0
+                unit_score = 0
+                price_score = 0
+                valid_rows = 0
+                
+                for row_idx in range(data_start, data_end):
+                    try:
+                        val = df.iloc[row_idx, col_idx]
+                        if pd.notna(val):
+                            val_str = str(val).strip()
+                            
+                            # Проверка на название (длинный текст)
+                            if len(val_str) > 3 and not self._is_numeric(val_str):
+                                # Проверяем, не является ли это единицей измерения
+                                if not self._is_unit_measurement(val_str):
+                                    name_score += 1
+                            
+                            # Проверка на единицу измерения
+                            if self._is_unit_measurement(val_str):
+                                unit_score += 1
+                            
+                            # Проверка на цену (числовое значение)
+                            if self._is_numeric(val_str):
+                                num_val = self._to_float_or_nan(val)
+                                if not math.isnan(num_val) and num_val > 0:
+                                    price_score += 1
+                            
+                            valid_rows += 1
+                    except (IndexError, KeyError):
+                        continue
+                
+                if valid_rows > 0:
+                    # Нормализуем оценки (процент от валидных строк)
+                    column_scores['name'][col_idx] = name_score / valid_rows
+                    column_scores['unit'][col_idx] = unit_score / valid_rows
+                    column_scores['price'][col_idx] = price_score / valid_rows
+            
+            # Выбираем колонки с наивысшими оценками
+            if product_col is None and column_scores['name']:
+                product_col = max(column_scores['name'].items(), key=lambda x: x[1])[0]
+                logger.info(f"Колонка с названиями определена по содержимому: {product_col} (оценка: {column_scores['name'][product_col]:.2%})")
+            
+            if unit_col is None and column_scores['unit']:
+                unit_col = max(column_scores['unit'].items(), key=lambda x: x[1])[0]
+                logger.info(f"Колонка с единицами определена по содержимому: {unit_col} (оценка: {column_scores['unit'][unit_col]:.2%})")
+            
+            if price_col is None and column_scores['price']:
+                price_col = max(column_scores['price'].items(), key=lambda x: x[1])[0]
+                logger.info(f"Колонка с ценами определена по содержимому: {price_col} (оценка: {column_scores['price'][price_col]:.2%})")
+        
+        # Fallback: если все еще не нашли, используем стандартные индексы
+        if product_col is None:
+            product_col = 0  # Первая колонка обычно название
+            logger.warning("Колонка с названиями не найдена, используется колонка 0")
+        if unit_col is None:
+            # Ищем колонку рядом с названием или ценой
+            if price_col is not None and price_col > 0:
+                unit_col = price_col - 1
+            elif product_col is not None and product_col < len(df.columns) - 1:
+                unit_col = product_col + 1
+            else:
+                unit_col = 1
+            logger.warning(f"Колонка с единицами не найдена, используется колонка {unit_col}")
+        if price_col is None:
+            # Ищем последнюю числовую колонку
+            price_col = len(df.columns) - 1
+            logger.warning(f"Колонка с ценами не найдена, используется колонка {price_col}")
+        
+        return product_col, unit_col, price_col
+    
+    def _is_numeric(self, value: str) -> bool:
+        """Проверяет, является ли значение числовым"""
+        if not value:
+            return False
+        try:
+            # Убираем пробелы и пробуем преобразовать
+            clean_val = value.replace(' ', '').replace(',', '.')
+            float(clean_val)
+            return True
+        except ValueError:
+            return False
     
     def _find_columns_by_keywords(self, df: pd.DataFrame, header_row: int) -> tuple:
         """Находит колонки по ключевым словам"""

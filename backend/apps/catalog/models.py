@@ -53,13 +53,16 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         # Автоматический пересчет итоговой цены
         # Если есть наценка поставщика в сомах, используем её
+        from decimal import Decimal
         if self.supplier and self.supplier.markup_som:
-            self.final_price = self.base_price + float(self.supplier.markup_som)
+            markup = Decimal(str(self.supplier.markup_som))
+            self.final_price = Decimal(str(self.base_price)) + markup
         elif self.base_price and self.markup_percent:
             # Если используется процентная наценка (старый способ)
-            self.final_price = self.base_price * (1 + float(self.markup_percent) / 100)
+            markup_percent = Decimal(str(self.markup_percent))
+            self.final_price = Decimal(str(self.base_price)) * (Decimal('1') + markup_percent / Decimal('100'))
         elif self.base_price:
-            self.final_price = self.base_price
+            self.final_price = Decimal(str(self.base_price))
         super().save(*args, **kwargs)
 
 

@@ -25,4 +25,23 @@ body {
   }
 }
 
+/* Скрытие скроллбара для свайпа названий товаров */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE и Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari и Opera */
+}
+
+/* Улучшение свайпа на мобильных */
+@media (max-width: 1024px) {
+  .swipeable-name {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
 

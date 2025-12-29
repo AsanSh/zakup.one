@@ -8,7 +8,12 @@ import HomePage from '../pages/HomePage'
 import ProductsPage from '../pages/ProductsPage'
 import CartPage from '../pages/CartPage'
 import OrdersPage from '../pages/OrdersPage'
+import OrderSuccessPage from '../pages/OrderSuccessPage'
 import AdminDashboard from '../pages/AdminDashboard'
+import AboutPage from '../pages/AboutPage'
+import SubscriptionPage from '../pages/SubscriptionPage'
+import TrackingPage from '../pages/TrackingPage'
+import ProfilePage from '../pages/ProfilePage'
 import apiClient from '../api/client'
 
 function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'ADMIN' | 'CLIENT' }) {
@@ -54,6 +59,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route 
             path="/customer" 
             element={
@@ -83,6 +89,38 @@ function App() {
             element={
               <PrivateRoute requiredRole="CLIENT">
                 <OrdersPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/orders/:id/success" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <OrderSuccessPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/subscription" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <SubscriptionPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/tracking/:orderId" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <TrackingPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <ProfilePage />
               </PrivateRoute>
             } 
           />

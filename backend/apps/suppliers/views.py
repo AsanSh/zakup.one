@@ -55,10 +55,16 @@ class SupplierViewSet(viewsets.ModelViewSet):
             instance.refresh_from_db()
             if old_markup != instance.markup_som:
                 from apps.catalog.models import Product
+                from decimal import Decimal
+                markup = Decimal(str(instance.markup_som or 0))
                 products = Product.objects.filter(supplier=instance)
+                updated_count = 0
                 for product in products:
-                    product.final_price = product.base_price + float(instance.markup_som or 0)
+                    base = Decimal(str(product.base_price))
+                    product.final_price = base + markup
                     product.save(update_fields=['final_price'])
+                    updated_count += 1
+                logger.info(f'Пересчитано {updated_count} товаров поставщика {instance.name} с наценкой {markup} сом')
             return Response(SupplierSerializer(serializer.instance).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -427,3 +433,43 @@ def import_products_from_parser(parser_result: dict, supplier: Supplier, price_l
     except Exception as e:
         logger.error(f'Ошибка импорта товаров: {str(e)}')
         raise
+
+
+class AdminStatsView(APIView):
+    """API endpoint для получения статистики админ-панели"""
+    permission_classes = [IsAdminRole]
+    
+    def get(self, request):
+        from apps.catalog.models import Product, Category
+        from apps.orders.models import Order
+        from apps.users.models import User
+        
+        stats = {
+            'suppliers': {
+                'total': Supplier.objects.count(),
+                'active': Supplier.objects.filter(is_active=True).count(),
+            },
+            'products': {
+                'total': Product.objects.count(),
+                'active': Product.objects.filter(is_active=True).count(),
+            },
+            'categories': {
+                'total': Category.objects.count(),
+            },
+            'orders': {
+                'total': Order.objects.count(),
+                'pending': Order.objects.filter(status='PENDING').count(),
+                'processing': Order.objects.filter(status='PROCESSING').count(),
+                'completed': Order.objects.filter(status='COMPLETED').count(),
+                'cancelled': Order.objects.filter(status='CANCELLED').count(),
+            },
+            'clients': {
+                'total': User.objects.filter(role='CLIENT').count(),
+                'active': User.objects.filter(role='CLIENT', is_active=True).count(),
+            },
+            'price_lists': {
+                'total': PriceList.objects.count(),
+            },
+        }
+        
+        return Response(stats)

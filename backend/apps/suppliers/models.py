@@ -45,9 +45,12 @@ class Supplier(models.Model):
         # Если наценка изменилась, пересчитываем цены всех товаров поставщика
         if old_markup is not None and old_markup != self.markup_som:
             from apps.catalog.models import Product
+            from decimal import Decimal
+            markup = Decimal(str(self.markup_som or 0))
             products = Product.objects.filter(supplier=self)
             for product in products:
-                product.final_price = product.base_price + float(self.markup_som or 0)
+                base = Decimal(str(product.base_price))
+                product.final_price = base + markup
                 product.save(update_fields=['final_price'])
 
 

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../store/userStore'
 import { useCartStore } from '../store/cartStore'
 import apiClient from '../api/client'
-import ClientHeader from '../components/ClientHeader'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 interface Product {
   id: number
@@ -68,8 +69,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ClientHeader activeTab="home" />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ paddingTop: '5rem' }}>
+      <Navbar activeTab="home" />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 lg:pb-8 pt-20">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -83,7 +84,14 @@ export default function HomePage() {
         {/* Рекомендованные товары */}
         <section className="mb-12">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">Рекомендованные товары</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold text-gray-900">Рекоменд. товары</h3>
+              {!loading && (
+                <span className="text-sm text-gray-600">
+                  Товаров ({recommendedProducts.length})
+                </span>
+              )}
+            </div>
             <button
               onClick={() => navigate('/customer/products')}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -96,30 +104,37 @@ export default function HomePage() {
               <div className="text-gray-500">Загрузка товаров...</div>
             </div>
           ) : recommendedProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {recommendedProducts.map((product) => (
-                <div key={product.id} className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow">
-                  <div className="mb-3">
-                    <h4 className="font-semibold text-gray-900 mb-1">{product.name}</h4>
-                    <p className="text-xs text-gray-500">{product.article}</p>
-                  </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500">{product.unit} • {product.origin || 'РФ'}</p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {Number(product.final_price).toLocaleString('ru-RU')} сом
-                      </p>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              {recommendedProducts.slice(0, 10).map((product, index) => (
+                <div key={product.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-500 flex-shrink-0">{index + 1}.</span>
+                      <div className="flex-1 min-w-0">
+                        {/* Мобильная версия с возможностью свайпа */}
+                        <div className="lg:hidden overflow-x-auto scrollbar-hide swipeable-name">
+                          <h4 className="font-semibold text-gray-900 whitespace-nowrap min-w-max select-none">{product.name}</h4>
+                        </div>
+                        {/* Десктоп версия */}
+                        <h4 className="hidden lg:block font-semibold text-gray-900 truncate">{product.name}</h4>
+                        <p className="text-xs text-gray-500 mt-1">{product.article} • {product.unit} • {product.origin || 'РФ'}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-sm font-bold text-gray-900">
+                          {Number(product.final_price).toLocaleString('ru-RU')} сом
+                        </span>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Добавить в корзину"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleAddToCart(product)}
-                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    В корзину
-                  </button>
                 </div>
               ))}
             </div>
@@ -133,7 +148,14 @@ export default function HomePage() {
         {/* Акционные товары */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">Акционные товары</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold text-gray-900">Акционные товары</h3>
+              {!loading && (
+                <span className="text-sm text-gray-600">
+                  Товаров ({promotionalProducts.length})
+                </span>
+              )}
+            </div>
             <button
               onClick={() => navigate('/customer/products')}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -146,35 +168,42 @@ export default function HomePage() {
               <div className="text-gray-500">Загрузка товаров...</div>
             </div>
           ) : promotionalProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {promotionalProducts.map((product) => (
-                <div key={product.id} className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow border-2 border-red-200">
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
-                        АКЦИЯ
-                      </span>
-                      <h4 className="font-semibold text-gray-900">{product.name}</h4>
+            <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-200">
+              {promotionalProducts.slice(0, 10).map((product, index) => (
+                <div key={product.id} className="p-4 hover:bg-gray-50 transition-colors border-l-4 border-red-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-500 flex-shrink-0">{index + 1}.</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                          АКЦИЯ
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {/* Мобильная версия с возможностью свайпа */}
+                        <div className="lg:hidden overflow-x-auto scrollbar-hide swipeable-name">
+                          <h4 className="font-semibold text-gray-900 whitespace-nowrap min-w-max select-none">{product.name}</h4>
+                        </div>
+                        {/* Десктоп версия */}
+                        <h4 className="hidden lg:block font-semibold text-gray-900 truncate">{product.name}</h4>
+                        <p className="text-xs text-gray-500 mt-1">{product.article} • {product.unit} • {product.origin || 'РФ'}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-sm font-bold text-red-600">
+                          {Number(product.final_price).toLocaleString('ru-RU')} сом
+                        </span>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Добавить в корзину"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">{product.article}</p>
                   </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500">{product.unit} • {product.origin || 'РФ'}</p>
-                      <p className="text-lg font-bold text-red-600">
-                        {Number(product.final_price).toLocaleString('ru-RU')} сом
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleAddToCart(product)}
-                    className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    В корзину
-                  </button>
                 </div>
               ))}
             </div>
@@ -185,6 +214,7 @@ export default function HomePage() {
           )}
         </section>
       </main>
+      <Footer />
     </div>
   )
 }
