@@ -14,12 +14,13 @@ from rest_framework.authtoken.models import Token
 import logging
 
 logger = logging.getLogger(__name__)
-from .models import User, Company, SavedCompany, SavedAddress, SavedRecipient, SubscriptionPlan, UserSubscription, UserCompany
+from .models import User, Company, SavedCompany, SavedAddress, SavedRecipient, SubscriptionPlan, UserSubscription, UserCompany, ChatThread, ChatMessage, Notification, UserInvitation
 from .serializers import (
     UserSerializer, UserCreateUpdateSerializer, RegisterSerializer,
     CompanySerializer, CompanyCreateUpdateSerializer, CompanyApproveSerializer,
     SavedCompanySerializer, SavedAddressSerializer, SavedRecipientSerializer,
-    SubscriptionPlanSerializer, UserSubscriptionSerializer, UserCompanySerializer
+    SubscriptionPlanSerializer, UserSubscriptionSerializer, UserCompanySerializer,
+    ChatThreadSerializer, ChatMessageSerializer, NotificationSerializer, UserInvitationSerializer
 )
 from .utils import send_email_verification, send_registration_submitted_email, send_admin_notification_email
 
@@ -240,6 +241,98 @@ class SavedCompanyViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class ChatThreadViewSet(ModelViewSet):
+    serializer_class = ChatThreadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return ChatThread.objects.all()
+        return ChatThread.objects.filter(user=user)
+
+    def create(self, request, *args, **kwargs):
+        # Проверяем, есть ли уже тред для этого пользователя
+        thread = ChatThread.objects.filter(user=request.user).first()
+        if thread:
+            serializer = self.get_serializer(thread)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # Создаем новый тред
+        serializer = self.get_serializer(data={})
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ChatMessageViewSet(ModelViewSet):
+    serializer_class = ChatMessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        thread_id = self.kwargs.get('thread_pk')
+        return ChatMessage.objects.filter(thread_id=thread_id).order_by('created_at')
+
+    def perform_create(self, serializer):
+        thread_id = self.kwargs.get('thread_pk')
+        thread = ChatThread.objects.get(id=thread_id)
+        serializer.save(thread=thread, sender=self.request.user)
+
+
+class NotificationViewSet(ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+
+
+class InviteUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        email = request.data.get('email')
+        role = request.data.get('role', 'ACCOUNTANT')
+        
+        if not email:
+            return Response({'detail': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Проверяем, существует ли уже пользователь с таким email
+        if User.objects.filter(email=email).exists():
+            return Response({'detail': 'Пользователь с таким email уже существует'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Проверяем, есть ли уже приглашение для этого email
+        if UserInvitation.objects.filter(email=email, accepted=False).exists():
+            return Response({'detail': 'Приглашение на этот email уже отправлено'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Генерируем токен
+        import secrets
+        token = secrets.token_urlsafe(32)
+        
+        # Создаем приглашение
+        invitation = UserInvitation.objects.create(
+            email=email,
+            role=role,
+            invited_by=request.user,
+            token=token
+        )
+        
+        # TODO: Отправить email с приглашением
+        # send_invitation_email(invitation)
+        
+        serializer = UserInvitationSerializer(invitation)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class SavedAddressViewSet(ModelViewSet):

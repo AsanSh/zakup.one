@@ -132,3 +132,4 @@ class SubscriptionCreateTestCase(TestCase):
         self.assertEqual(response['Content-Type'], 'application/json')
         self.assertIsInstance(response.data, dict)
 
+

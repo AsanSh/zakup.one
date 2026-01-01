@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import User, Company, SavedCompany, SavedAddress, SavedRecipient, SubscriptionPlan, UserSubscription, UserCompany
+from .models import User, Company, SavedCompany, SavedAddress, SavedRecipient, SubscriptionPlan, UserSubscription, UserCompany, ChatThread, ChatMessage, Notification, UserInvitation
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -228,3 +228,57 @@ class UserCompanySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source='sender.full_name', read_only=True)
+    sender_role = serializers.CharField(source='sender.role', read_only=True)
+
+    class Meta:
+        model = ChatMessage
+        fields = ['id', 'sender', 'sender_name', 'sender_role', 'message', 'is_read', 'created_at']
+        read_only_fields = ['sender', 'is_read', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['sender'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class ChatThreadSerializer(serializers.ModelSerializer):
+    admin_name = serializers.CharField(source='admin.full_name', read_only=True)
+    last_message = serializers.SerializerMethodField()
+    last_message_at = serializers.SerializerMethodField()
+    unread_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = ChatThread
+        fields = ['id', 'user', 'admin', 'admin_name', 'last_message', 'last_message_at', 'unread_count', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
+
+    def get_last_message(self, obj):
+        last_msg = obj.last_message
+        return last_msg.message if last_msg else None
+
+    def get_last_message_at(self, obj):
+        last_msg = obj.last_message
+        return last_msg.created_at if last_msg else None
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'type', 'is_read', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class UserInvitationSerializer(serializers.ModelSerializer):
+    invited_by_name = serializers.CharField(source='invited_by.full_name', read_only=True)
+
+    class Meta:
+        model = UserInvitation
+        fields = ['id', 'email', 'role', 'invited_by', 'invited_by_name', 'token', 'accepted', 'accepted_at', 'created_at']
+        read_only_fields = ['invited_by', 'token', 'accepted', 'accepted_at', 'created_at']

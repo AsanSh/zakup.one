@@ -57,7 +57,7 @@ def frontend_catchall(request):
         <html>
         <head>
             <title>ZAKUP.ONE</title>
-            <meta http-equiv="refresh" content="0;url=http://localhost:5173/admin/">
+            <meta http-equiv="refresh" content="0;url=http://localhost:5173/kojoyun/">
         </head>
         <body>
             <p>Redirecting to frontend...</p>

@@ -14,6 +14,10 @@ import AboutPage from '../pages/AboutPage'
 import SubscriptionPage from '../pages/SubscriptionPage'
 import TrackingPage from '../pages/TrackingPage'
 import ProfilePage from '../pages/ProfilePage'
+import ChatPage from '../pages/ChatPage'
+import NotificationsPage from '../pages/NotificationsPage'
+import InstructionsPage from '../pages/InstructionsPage'
+import FAQPage from '../pages/FAQPage'
 import apiClient from '../api/client'
 
 function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'ADMIN' | 'CLIENT' }) {
@@ -39,7 +43,7 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
   }
   
   if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to={user.role === 'ADMIN' ? '/admin' : '/customer'} replace />
+    return <Navigate to={user.role === 'ADMIN' ? '/kojoyun' : '/customer'} replace />
   }
   
   return <>{children}</>
@@ -109,6 +113,14 @@ function App() {
             } 
           />
           <Route 
+            path="/tracking" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <TrackingPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
             path="/tracking/:orderId" 
             element={
               <PrivateRoute requiredRole="CLIENT">
@@ -125,11 +137,49 @@ function App() {
             } 
           />
           <Route 
-            path="/admin" 
+            path="/chat" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <ChatPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/profile/notifications" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <NotificationsPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/profile/instructions" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <InstructionsPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/profile/faq" 
+            element={
+              <PrivateRoute requiredRole="CLIENT">
+                <FAQPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/kojoyun" 
             element={
               <PrivateRoute requiredRole="ADMIN">
                 <AdminDashboard />
               </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <Navigate to="/kojoyun" replace />
             } 
           />
         </Routes>

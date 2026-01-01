@@ -458,9 +458,9 @@ class AdminStatsView(APIView):
             },
             'orders': {
                 'total': Order.objects.count(),
-                'pending': Order.objects.filter(status='PENDING').count(),
-                'processing': Order.objects.filter(status='PROCESSING').count(),
-                'completed': Order.objects.filter(status='COMPLETED').count(),
+                'pending': Order.objects.filter(status='NEW').count(),
+                'processing': Order.objects.filter(status__in=['IN_PROGRESS', 'COLLECTED']).count(),
+                'completed': Order.objects.filter(status='DELIVERED').count(),
                 'cancelled': Order.objects.filter(status='CANCELLED').count(),
             },
             'clients': {

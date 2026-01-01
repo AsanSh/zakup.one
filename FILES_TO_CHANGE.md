@@ -22,3 +22,4 @@
 4. **/opt/zakup/frontend/src/components/ProductBadges.tsx** (новый, опционально)
    - Компонент для отображения меток товара
 
+

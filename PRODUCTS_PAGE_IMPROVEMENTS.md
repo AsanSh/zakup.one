@@ -177,3 +177,4 @@ function parseProductName(name: string): { mainName: string; badges: string[] }
 
 Все требования выполнены. Страница товаров полностью переработана с современным UI/UX.
 
+

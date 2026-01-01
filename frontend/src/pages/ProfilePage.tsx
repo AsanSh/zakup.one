@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import apiClient from '../api/client'
 import Navbar from '../components/Navbar'
 import ModernModal from '../components/ModernModal'
 import ConfirmCancelSubscriptionModal from '../components/ConfirmCancelSubscriptionModal'
 import CompanyFormModal from '../components/CompanyFormModal'
+import InviteUserModal from '../components/InviteUserModal'
 import { useUserStore } from '../store/userStore'
 
 interface SubscriptionPlan {
@@ -60,6 +61,9 @@ export default function ProfilePage() {
   const [showCompanyModal, setShowCompanyModal] = useState(false)
   const [editingCompany, setEditingCompany] = useState<UserCompany | null>(null)
   const [savingCompany, setSavingCompany] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviting, setInviting] = useState(false)
+  const location = useLocation()
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'info' }>({
     isOpen: false,
     title: '',
@@ -69,6 +73,16 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadData()
+    
+    // Слушаем событие для открытия модалки приглашения из UserMenu
+    const handleOpenInviteModal = () => {
+      setShowInviteModal(true)
+    }
+    window.addEventListener('openInviteModal', handleOpenInviteModal)
+    
+    return () => {
+      window.removeEventListener('openInviteModal', handleOpenInviteModal)
+    }
   }, [])
 
   const loadData = async () => {
@@ -525,18 +539,150 @@ export default function ProfilePage() {
     )
   }
 
+  const handleInviteUser = async (email: string, role: string) => {
+    try {
+      setInviting(true)
+      await apiClient.post('/api/auth/invite-user/', { email, role })
+      setModal({
+        isOpen: true,
+        title: 'Успешно',
+        message: `Приглашение отправлено на ${email}`,
+        type: 'success'
+      })
+    } catch (error: any) {
+      console.error('Ошибка приглашения пользователя:', error)
+      let errorMessage = 'Не удалось отправить приглашение'
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail
+      } else if (error.response?.data?.email) {
+        errorMessage = Array.isArray(error.response.data.email) 
+          ? error.response.data.email[0] 
+          : error.response.data.email
+      }
+      throw new Error(errorMessage)
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const menuItems = [
+    {
+      id: 'profile',
+      label: 'Профиль',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      path: '/profile',
+      onClick: () => navigate('/profile')
+    },
+    {
+      id: 'notifications',
+      label: 'Уведомления',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      ),
+      path: '/profile/notifications',
+      onClick: () => navigate('/profile/notifications')
+    },
+    {
+      id: 'subscription',
+      label: 'Подписка',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      path: '/subscription',
+      onClick: () => navigate('/subscription')
+    },
+    {
+      id: 'instructions',
+      label: 'Инструкции',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      path: '/profile/instructions',
+      onClick: () => navigate('/profile/instructions')
+    },
+    {
+      id: 'faq',
+      label: 'FAQ',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      path: '/profile/faq',
+      onClick: () => navigate('/profile/faq')
+    },
+    {
+      id: 'invite',
+      label: 'Добавить пользователя',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+        </svg>
+      ),
+      onClick: () => setShowInviteModal(true)
+    }
+  ]
+
+  const currentPath = location.pathname
+  const activeItem = menuItems.find(item => item.path === currentPath) || menuItems[0]
+
   return (
     <>
       <Navbar />
       <div className="min-h-screen bg-gray-50 pt-32 pb-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Профиль</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-2">
-              Управление подпиской и данными аккаунта
-            </p>
-          </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Sidebar Menu */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-24">
+                {/* User Info */}
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <div className="text-sm font-semibold text-gray-900 mb-1">Пользователь</div>
+                  <div className="text-xs text-gray-500 mb-2">{user?.role === 'ADMIN' ? 'Администратор' : 'Клиент'}</div>
+                  <div className="text-sm text-gray-900">{user?.email || '-'}</div>
+                </div>
+
+                {/* Menu Items */}
+                <nav className="space-y-1">
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={item.onClick}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        activeItem.id === item.id
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <span className={activeItem.id === item.id ? 'text-gray-900' : 'text-gray-500'}>
+                        {item.icon}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="lg:col-span-3">
+              {/* Header */}
+              <div className="mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Профиль</h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-2">
+                  Управление подпиской и данными аккаунта
+                </p>
+              </div>
 
           {/* User Info Card */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -773,6 +919,8 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -810,6 +958,13 @@ export default function ProfilePage() {
           is_default: editingCompany.is_default
         } : null}
         loading={savingCompany}
+      />
+
+      <InviteUserModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onInvite={handleInviteUser}
+        loading={inviting}
       />
     </>
   )

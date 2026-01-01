@@ -238,3 +238,95 @@ class UserCompany(models.Model):
         self.save()
 
 
+class ChatThread(models.Model):
+    """Тред чата между пользователем и администратором/специалистом"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_threads', verbose_name='Пользователь')
+    admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_chat_threads', verbose_name='Администратор/Специалист')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
+
+    class Meta:
+        verbose_name = 'Тред чата'
+        verbose_name_plural = 'Треды чатов'
+        ordering = ['-updated_at']
+        unique_together = [['user', 'admin']]
+
+    def __str__(self):
+        return f"Чат {self.user.email} - {self.admin.email if self.admin else 'Ожидание'}"
+    
+    @property
+    def last_message(self):
+        return self.messages.order_by('-created_at').first()
+    
+    @property
+    def unread_count(self):
+        return self.messages.filter(is_read=False).exclude(sender=self.user).count()
+
+
+class ChatMessage(models.Model):
+    """Сообщения в чате"""
+    thread = models.ForeignKey(ChatThread, on_delete=models.CASCADE, related_name='messages', verbose_name='Тред')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages', verbose_name='Отправитель')
+    message = models.TextField(verbose_name='Сообщение')
+    is_read = models.BooleanField(default=False, verbose_name='Прочитано')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+
+    class Meta:
+        verbose_name = 'Сообщение чата'
+        verbose_name_plural = 'Сообщения чатов'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.sender.email}: {self.message[:50]}"
+
+
+class Notification(models.Model):
+    """Уведомления для пользователей"""
+    TYPE_CHOICES = [
+        ('info', 'Информация'),
+        ('success', 'Успех'),
+        ('warning', 'Предупреждение'),
+        ('error', 'Ошибка'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', verbose_name='Пользователь')
+    title = models.CharField(max_length=255, verbose_name='Заголовок')
+    message = models.TextField(verbose_name='Сообщение')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='info', verbose_name='Тип')
+    is_read = models.BooleanField(default=False, verbose_name='Прочитано')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+
+    class Meta:
+        verbose_name = 'Уведомление'
+        verbose_name_plural = 'Уведомления'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email}: {self.title}"
+
+
+class UserInvitation(models.Model):
+    """Приглашения пользователей"""
+    ROLE_CHOICES = [
+        ('ACCOUNTANT', 'Бухгалтер'),
+        ('PROCUREMENT', 'Снабженец'),
+        ('OWNER', 'Владелец компании'),
+    ]
+    
+    email = models.EmailField(verbose_name='Email')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name='Роль')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations', verbose_name='Пригласил')
+    token = models.CharField(max_length=100, unique=True, verbose_name='Токен приглашения')
+    accepted = models.BooleanField(default=False, verbose_name='Принято')
+    accepted_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата принятия')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+
+    class Meta:
+        verbose_name = 'Приглашение пользователя'
+        verbose_name_plural = 'Приглашения пользователей'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.email} ({self.role})"
+
+

@@ -20,6 +20,7 @@ class OrderSerializer(serializers.ModelSerializer):
     total_amount = serializers.SerializerMethodField()
     client_email = serializers.EmailField(source='client.email', read_only=True)
     installment = serializers.BooleanField(read_only=True)
+    client = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -31,6 +32,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'total_amount', 'items', 'installment', 'created_at', 'updated_at'
         ]
         read_only_fields = ['order_number', 'created_at', 'updated_at', 'total_amount', 'installment']
+
+    def get_client(self, obj):
+        """Возвращаем упрощенную информацию о клиенте"""
+        return {
+            'id': obj.client.id,
+            'email': obj.client.email,
+            'full_name': obj.client.full_name or ''
+        }
 
     def get_total_amount(self, obj):
         try:
@@ -236,29 +245,27 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class DeliveryTrackingSerializer(serializers.ModelSerializer):
     order_number = serializers.CharField(source='order.order_number', read_only=True)
     status_label = serializers.SerializerMethodField()
-    locked = serializers.SerializerMethodField()
-    reason = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(read_only=True)
+    message = serializers.CharField(read_only=True, required=False, allow_null=True)
 
     class Meta:
         model = DeliveryTracking
-        fields = ['id', 'order', 'order_number', 'status', 'status_label', 'weight', 'volume',
-                  'items_count', 'status_history', 'updated_at', 'created_at', 'locked', 'reason']
-        read_only_fields = ['status_history', 'updated_at', 'created_at', 'locked', 'reason']
+        fields = [
+            'id', 'order', 'order_number', 'status', 'status_label', 
+            'driver_name', 'driver_phone', 'vehicle_number',
+            'current_lat', 'current_lng', 'eta_minutes',
+            'pickup_address', 'pickup_lat', 'pickup_lng',
+            'is_active', 'weight', 'volume', 'items_count', 
+            'status_history', 'updated_at', 'created_at', 'message',
+            'loading_photo', 'unloading_photo', 'confirmation_photo'
+        ]
+        read_only_fields = [
+            'status_history', 'updated_at', 'created_at', 
+            'is_active', 'message'
+        ]
 
     def get_status_label(self, obj):
         if isinstance(obj, dict):
             return obj.get('status_label', '')
         return dict(DeliveryTracking.STATUS_CHOICES).get(obj.status, obj.status)
-    
-    def get_locked(self, obj):
-        if isinstance(obj, dict):
-            return obj.get('locked', False)
-        # Locked состояние определяется подпиской, а не оплатой заказа
-        return False
-    
-    def get_reason(self, obj):
-        if isinstance(obj, dict):
-            return obj.get('reason', '')
-        # Причина блокировки определяется подпиской
-        return None
 

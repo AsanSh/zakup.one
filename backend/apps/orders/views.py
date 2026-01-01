@@ -156,6 +156,7 @@ class InvoiceViewSet(ModelViewSet):
 class DeliveryTrackingViewSet(ModelViewSet):
     serializer_class = DeliveryTrackingSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'put', 'delete', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
@@ -176,8 +177,67 @@ class DeliveryTrackingViewSet(ModelViewSet):
         
         return queryset
     
+    def create(self, request, *args, **kwargs):
+        """Создание трекинга с проверкой прав"""
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Только администратор может создавать трекинг'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        order_id = request.data.get('order')
+        if not order_id:
+            return Response({'error': 'Не указан заказ'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({'error': 'Заказ не найден'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Проверяем, не существует ли уже трекинг
+        try:
+            tracking = DeliveryTracking.objects.get(order=order)
+            created = False
+        except DeliveryTracking.DoesNotExist:
+            tracking = DeliveryTracking.objects.create(
+                order=order,
+                status=request.data.get('status', 'WAITING_FOR_DRIVER'),
+                driver_name=request.data.get('driver_name', '') or None,
+                driver_phone=request.data.get('driver_phone', '') or None,
+                vehicle_number=request.data.get('vehicle_number', '') or None,
+                pickup_address=request.data.get('pickup_address', '') or None,
+                pickup_lat=float(request.data.get('pickup_lat')) if request.data.get('pickup_lat') else None,
+                pickup_lng=float(request.data.get('pickup_lng')) if request.data.get('pickup_lng') else None,
+                items_count=order.items.count()
+            )
+            created = True
+        
+        if not created:
+            # Обновляем существующий трекинг
+            if 'status' in request.data:
+                tracking.status = request.data.get('status')
+            if 'driver_name' in request.data:
+                tracking.driver_name = request.data.get('driver_name') or None
+            if 'driver_phone' in request.data:
+                tracking.driver_phone = request.data.get('driver_phone') or None
+            if 'vehicle_number' in request.data:
+                tracking.vehicle_number = request.data.get('vehicle_number') or None
+            if 'pickup_address' in request.data:
+                tracking.pickup_address = request.data.get('pickup_address') or None
+            if 'pickup_lat' in request.data:
+                pickup_lat = request.data.get('pickup_lat')
+                tracking.pickup_lat = float(pickup_lat) if pickup_lat else None
+            if 'pickup_lng' in request.data:
+                pickup_lng = request.data.get('pickup_lng')
+                tracking.pickup_lng = float(pickup_lng) if pickup_lng else None
+            tracking.save()
+        
+        serializer = DeliveryTrackingSerializer(tracking)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+    
     def list(self, request, *args, **kwargs):
-        """Переопределяем list для обработки случая когда трекинг не найден, но заказ существует"""
+        """
+        Переопределяем list для обработки трекинга.
+        ВСЕГДА возвращает 200, даже если трекинг неактивен.
+        """
         order_id = request.query_params.get('order', None)
         
         if order_id:
@@ -194,46 +254,51 @@ class DeliveryTrackingViewSet(ModelViewSet):
                             status=status.HTTP_403_FORBIDDEN
                         )
                     
-                    # Проверяем подписку пользователя (трекинг доступен только для Стандарт и VIP)
+                    # Проверяем подписку пользователя
                     from apps.users.models import UserSubscription
                     subscription = UserSubscription.objects.filter(
                         user=order.client,
                         status='ACTIVE'
                     ).select_related('plan').first()
                     
-                    # Проверяем наличие активной подписки с доступом к трекингу
-                    has_tracking_access = (subscription and 
-                                         subscription.is_active and 
-                                         subscription.plan.delivery_tracking_available)
+                    # Проверяем оплату заказа
+                    is_paid = order.status in ['PAID', 'IN_PROGRESS', 'COLLECTED', 'IN_DELIVERY', 'DELIVERED']
                     
-                    if not has_tracking_access:
-                        # Подписка не позволяет трекинг (Базовый тариф или нет подписки)
-                        plan_name = subscription.plan.name if subscription and subscription.plan else 'Базовый'
-                        return Response({
-                            'locked': True,
-                            'reason': f'Трекинг доступен только для тарифов Стандарт и VIP. Ваш тариф: {plan_name}',
-                            'order': {
-                                'id': order.id,
-                                'order_number': order.order_number,
-                                'status': order.status,
-                                'status_label': dict(Order.STATUS_CHOICES).get(order.status, order.status)
-                            }
-                        })
+                    # Проверяем доступ к трекингу по подписке
+                    has_tracking_subscription = (subscription and 
+                                               subscription.is_active and 
+                                               subscription.plan.delivery_tracking_available)
                     
-                    # Подписка позволяет трекинг - проверяем наличие трекинга
+                    # Вычисляем is_active: заказ должен быть оплачен И подписка должна позволять трекинг
+                    is_active = is_paid and has_tracking_subscription
+                    
+                    # Получаем или создаем трекинг
                     tracking = DeliveryTracking.objects.filter(order_id=order_id_int).first()
-                    
                     if not tracking:
-                        # Трекинг не создан - создаем его
                         tracking = DeliveryTracking.objects.create(
                             order=order,
-                            status='ACCEPTED',
+                            status='WAITING_FOR_DRIVER',
                             items_count=order.items.count()
                         )
-                        return Response(DeliveryTrackingSerializer(tracking).data)
                     
-                    # Трекинг существует - возвращаем его
-                    return Response(DeliveryTrackingSerializer(tracking).data)
+                    # Обновляем is_active в трекинге
+                    tracking.is_active = is_active
+                    tracking.save()
+                    
+                    # Сериализуем данные
+                    serializer = DeliveryTrackingSerializer(tracking)
+                    data = serializer.data
+                    
+                    # Если трекинг неактивен, добавляем сообщение
+                    if not is_active:
+                        if not is_paid:
+                            data['message'] = 'Трекинг доставки становится доступным после оплаты заказа'
+                        elif not has_tracking_subscription:
+                            plan_name = subscription.plan.name if subscription and subscription.plan else 'Базовый'
+                            data['message'] = f'Трекинг доступен только для тарифов Стандарт и VIP. Ваш тариф: {plan_name}'
+                    
+                    # ВСЕГДА возвращаем 200
+                    return Response(data, status=status.HTTP_200_OK)
                     
                 except Order.DoesNotExist:
                     return Response(
@@ -258,11 +323,55 @@ class DeliveryTrackingViewSet(ModelViewSet):
         tracking = self.get_object()
         new_status = request.data.get('status')
         
-        if new_status not in dict(DeliveryTracking.STATUS_CHOICES):
+        if new_status and new_status not in dict(DeliveryTracking.STATUS_CHOICES):
             return Response({'error': 'Неверный статус'}, status=status.HTTP_400_BAD_REQUEST)
         
-        tracking.update_status(new_status, operator=request.user)
+        # Обновляем данные водителя если переданы
+        if 'driver_name' in request.data:
+            tracking.driver_name = request.data.get('driver_name') or None
+        if 'driver_phone' in request.data:
+            tracking.driver_phone = request.data.get('driver_phone') or None
+        if 'vehicle_number' in request.data:
+            tracking.vehicle_number = request.data.get('vehicle_number') or None
+        
+        # Обновляем адрес погрузки если передан
+        if 'pickup_address' in request.data:
+            tracking.pickup_address = request.data.get('pickup_address') or None
+        if 'pickup_lat' in request.data:
+            pickup_lat = request.data.get('pickup_lat')
+            tracking.pickup_lat = float(pickup_lat) if pickup_lat else None
+        if 'pickup_lng' in request.data:
+            pickup_lng = request.data.get('pickup_lng')
+            tracking.pickup_lng = float(pickup_lng) if pickup_lng else None
+        
+        # Обновляем статус если передан
+        if new_status:
+            tracking.update_status(new_status, operator=request.user)
+        else:
+            tracking.save()
+        
         return Response(DeliveryTrackingSerializer(tracking).data)
+    
+    def partial_update(self, request, pk=None):
+        """Обновление трекинга через PATCH"""
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
+        
+        tracking = self.get_object()
+        
+        # Обновляем поля
+        if 'status' in request.data:
+            new_status = request.data.get('status')
+            if new_status not in dict(DeliveryTracking.STATUS_CHOICES):
+                return Response({'error': 'Неверный статус'}, status=status.HTTP_400_BAD_REQUEST)
+            tracking.update_status(new_status, operator=request.user)
+        
+        # Обновляем остальные поля
+        serializer = DeliveryTrackingSerializer(tracking, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 

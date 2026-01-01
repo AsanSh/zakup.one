@@ -151,3 +151,4 @@ curl -X POST http://localhost:8000/api/auth/subscriptions/ \
 - ✅ Unit-тесты добавлены
 - ✅ Фронтенд правильно обрабатывает ошибки
 
+

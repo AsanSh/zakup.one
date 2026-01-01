@@ -14,7 +14,8 @@ urlpatterns = [
     path('api/orders/', include('apps.orders.urls')),
     path('api/admin/', include('apps.suppliers.urls')),
     # Catch-all для фронтенд роутов (React Router)
-    path('admin/', views.frontend_catchall, name='frontend-catchall'),
+    path('kojoyun/', views.frontend_catchall, name='frontend-catchall'),
+    path('admin/', views.frontend_catchall, name='frontend-catchall-old'),  # Редирект со старого пути
 ]
 
 if settings.DEBUG:

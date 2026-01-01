@@ -236,11 +236,18 @@ export default function OrdersPage() {
                           >
                             №{order.order_number || order.id}
                           </button>
-                          {hasTrackingAccess ? (
-                            <span className="text-xs text-green-600 flex-shrink-0" title="Трекинг доступен">📍</span>
-                          ) : (
-                            <span className="text-xs text-gray-400 flex-shrink-0" title="Трекинг недоступен (требуется тариф Стандарт или VIP)">🔒</span>
-                          )}
+                          {(() => {
+                            const isPaid = order.status === 'PAID' || ['IN_PROGRESS', 'COLLECTED', 'IN_DELIVERY', 'DELIVERED'].includes(order.status)
+                            const isCompleted = order.status === 'DELIVERED'
+                            
+                            if (isCompleted) {
+                              return <span key="completed" className="text-xs text-green-600 flex-shrink-0" title="Доставка завершена">✅</span>
+                            } else if (isPaid && hasTrackingAccess) {
+                              return <span key="tracking" className="text-xs text-green-600 flex-shrink-0" title="Трекинг активен">📍</span>
+                            } else {
+                              return <span key="locked" className="text-xs text-gray-400 flex-shrink-0" title="Трекинг недоступен">🔒</span>
+                            }
+                          })()}
                           <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full flex-shrink-0 ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}>
                             {statusLabels[order.status] || order.status}
                           </span>
@@ -320,8 +327,8 @@ export default function OrdersPage() {
                     {/* Expanded Items */}
                     {isExpanded && (
                       <div className="mt-3 space-y-2">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="bg-gray-50 rounded-lg p-2">
+                        {order.items.map((item, itemIdx) => (
+                          <div key={item.id || `item-${order.id}-${itemIdx}`} className="bg-gray-50 rounded-lg p-2">
                             <div className="font-medium text-xs text-gray-900 mb-1">{item.product.name}</div>
                             <div className="flex items-center justify-between text-[10px]">
                               <span className="text-gray-500">{item.product.article}</span>
@@ -395,11 +402,18 @@ export default function OrdersPage() {
                               >
                                 №{order.order_number || order.id}
                               </button>
-                              {hasTrackingAccess ? (
-                                <span className="text-xs text-green-600" title="Трекинг доступен">📍</span>
-                              ) : (
-                                <span className="text-xs text-gray-400" title="Трекинг недоступен (требуется тариф Стандарт или VIP)">🔒</span>
-                              )}
+                              {(() => {
+                                const isPaid = order.status === 'PAID' || ['IN_PROGRESS', 'COLLECTED', 'IN_DELIVERY', 'DELIVERED'].includes(order.status)
+                                const isCompleted = order.status === 'DELIVERED'
+                                
+                                if (isCompleted) {
+                                  return <span key="completed" className="text-xs text-green-600" title="Доставка завершена">✅</span>
+                                } else if (isPaid && hasTrackingAccess) {
+                                  return <span key="tracking" className="text-xs text-green-600" title="Трекинг активен">📍</span>
+                                } else {
+                                  return <span key="locked" className="text-xs text-gray-400" title="Трекинг недоступен">🔒</span>
+                                }
+                              })()}
                             </div>
                                 <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}>
                                   {statusLabels[order.status] || order.status}
@@ -465,8 +479,8 @@ export default function OrdersPage() {
                                 <div className="bg-gray-100 rounded-lg p-3">
                                   <div className="text-xs font-semibold text-gray-700 mb-2">Товары:</div>
                                   <div className="space-y-1.5">
-                                    {order.items.map((item) => (
-                                      <div key={item.id} className="flex items-center justify-between text-xs bg-white rounded p-2">
+                                    {order.items.map((item, itemIdx) => (
+                                      <div key={item.id || `item-${order.id}-${itemIdx}`} className="flex items-center justify-between text-xs bg-white rounded p-2">
                                         <div className="flex-1 min-w-0">
                                           <div className="font-medium text-gray-900 truncate">{item.product.name}</div>
                                           <div className="text-gray-500">{item.product.article}</div>

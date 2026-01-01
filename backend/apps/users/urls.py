@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     LoginView, RegisterView, VerifyEmailView, CurrentUserView, UserListView,
     UserViewSet, CompanyViewSet, SavedCompanyViewSet, SavedAddressViewSet,
-    SavedRecipientViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, UserCompanyViewSet
+    SavedRecipientViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, UserCompanyViewSet,
+    ChatThreadViewSet, ChatMessageViewSet, NotificationViewSet, InviteUserView
 )
 
 router = DefaultRouter()
@@ -15,6 +16,8 @@ router.register(r'saved-recipients', SavedRecipientViewSet, basename='saved-reci
 router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscription-plan')
 router.register(r'subscriptions', UserSubscriptionViewSet, basename='subscription')
 router.register(r'user-companies', UserCompanyViewSet, basename='user-company')
+router.register(r'chat/thread', ChatThreadViewSet, basename='chat-thread')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 app_name = 'users'
 
@@ -25,4 +28,6 @@ urlpatterns = [
     path('verify-email/', VerifyEmailView.as_view(), name='verify-email'),
     path('me/', CurrentUserView.as_view(), name='current-user'),
     path('users/', UserListView.as_view(), name='user-list'),
+    path('invite-user/', InviteUserView.as_view(), name='invite-user'),
+    path('chat/thread/<int:thread_pk>/messages/', ChatMessageViewSet.as_view({'get': 'list', 'post': 'create'}), name='chat-messages'),
 ]

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import apiClient from '../api/client'
+import YandexAddressInput from './YandexAddressInput'
 
 export interface CheckoutFormData {
   recipient_name: string
@@ -209,18 +210,12 @@ export default function CheckoutForm({ onSubmit, loading = false, defaultValues 
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Адрес доставки <span className="text-red-500">*</span>
             </label>
-            <textarea
+            <YandexAddressInput
               value={formData.delivery_address}
-              onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
-              rows={3}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base resize-none ${
-                errors.delivery_address ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={(address) => setFormData({ ...formData, delivery_address: address })}
               placeholder="Введите адрес доставки"
+              error={errors.delivery_address}
             />
-            {errors.delivery_address && (
-              <p className="mt-1 text-xs text-red-500">{errors.delivery_address}</p>
-            )}
           </div>
 
           <div>

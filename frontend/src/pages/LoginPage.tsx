@@ -29,7 +29,7 @@ export default function LoginPage() {
 
         // Перенаправляем в зависимости от роли
         if (response.data.user.role === 'ADMIN') {
-          navigate('/admin', { replace: true })
+          navigate('/kojoyun', { replace: true })
         } else {
           navigate('/customer', { replace: true })
         }

@@ -197,20 +197,55 @@ class Invoice(models.Model):
 
 class DeliveryTracking(models.Model):
     """Трекинг доставки заказа"""
+    # Обязательные статусы доставки (единый источник правды)
     STATUS_CHOICES = [
-        ('ACCEPTED', 'Заказ принят'),
-        ('COLLECTED', 'Собран'),
-        ('IN_TRANSIT', 'Передан в доставку'),
-        ('ON_THE_WAY', 'В пути'),
-        ('DELIVERED', 'Доставлен'),
+        ('WAITING_FOR_DRIVER', 'Ожидание водителя'),
+        ('DRIVER_ASSIGNED', 'Водитель назначен'),
+        ('WAITING_FOR_LOADING', 'Ожидает погрузки'),
+        ('ON_THE_WAY_TO_PICKUP', 'Едет к складу'),
+        ('ARRIVED_AT_PICKUP', 'Прибыл на склад'),
+        ('LOADED', 'Загружен'),
+        ('ON_THE_WAY_TO_DESTINATION', 'В пути к получателю'),
+        ('DELIVERED_PENDING_CONFIRM', 'Доставлен (ожидает подтверждения)'),
+        ('COMPLETED', 'Завершён'),
     ]
 
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='tracking', verbose_name='Заявка')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACCEPTED', verbose_name='Статус')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='WAITING_FOR_DRIVER', verbose_name='Статус')
+    
+    # Информация о водителе
+    driver_name = models.CharField(max_length=255, null=True, blank=True, verbose_name='Имя водителя')
+    driver_phone = models.CharField(max_length=20, null=True, blank=True, verbose_name='Телефон водителя')
+    vehicle_number = models.CharField(max_length=20, null=True, blank=True, verbose_name='Номер автомобиля')
+    
+    # Геолокация
+    current_lat = models.FloatField(null=True, blank=True, verbose_name='Текущая широта')
+    current_lng = models.FloatField(null=True, blank=True, verbose_name='Текущая долгота')
+    
+    # Адрес погрузки
+    pickup_address = models.TextField(null=True, blank=True, verbose_name='Адрес погрузки')
+    pickup_lat = models.FloatField(null=True, blank=True, verbose_name='Широта адреса погрузки')
+    pickup_lng = models.FloatField(null=True, blank=True, verbose_name='Долгота адреса погрузки')
+    
+    # ETA
+    eta_minutes = models.IntegerField(null=True, blank=True, verbose_name='ETA (минуты)')
+    
+    # Активность трекинга
+    is_active = models.BooleanField(default=False, verbose_name='Трекинг активен')
+    
+    # Дополнительная информация
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Вес (кг)')
     volume = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Объем (м³)')
     items_count = models.IntegerField(default=0, verbose_name='Количество позиций')
+    
+    # История статусов
     status_history = models.JSONField(default=list, verbose_name='История статусов')
+    
+    # Фото
+    loading_photo = models.ImageField(upload_to='tracking/loading/', null=True, blank=True, verbose_name='Фото загрузки')
+    unloading_photo = models.ImageField(upload_to='tracking/unloading/', null=True, blank=True, verbose_name='Фото выгрузки')
+    confirmation_photo = models.ImageField(upload_to='tracking/confirmation/', null=True, blank=True, verbose_name='Фото подтверждения')
+    
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
 
@@ -222,17 +257,57 @@ class DeliveryTracking(models.Model):
     def __str__(self):
         return f"Трекинг заявки {self.order.order_number}"
 
-    def update_status(self, new_status, operator=None):
+    def update_status(self, new_status, operator=None, driver_name=None, lat=None, lng=None, eta_minutes=None):
         """Обновить статус и сохранить в историю"""
         old_status = self.status
         self.status = new_status
+        
+        # Обновляем геолокацию и ETA если переданы
+        if lat is not None:
+            self.current_lat = lat
+        if lng is not None:
+            self.current_lng = lng
+        if eta_minutes is not None:
+            self.eta_minutes = eta_minutes
+        if driver_name:
+            self.driver_name = driver_name
+        
+        # Сохраняем в историю
         self.status_history.append({
             'status': new_status,
             'old_status': old_status,
             'timestamp': timezone.now().isoformat(),
-            'operator': operator.email if operator else None
+            'operator': operator.email if operator else None,
+            'driver_name': driver_name,
+            'lat': lat,
+            'lng': lng,
+            'eta_minutes': eta_minutes
         })
         self.save()
+    
+    def calculate_is_active(self):
+        """Вычислить is_active на основе оплаты заказа и подписки"""
+        # Проверяем оплату заказа
+        is_paid = self.order.status in ['PAID', 'IN_PROGRESS', 'COLLECTED', 'IN_DELIVERY', 'DELIVERED']
+        
+        # Проверяем подписку пользователя
+        try:
+            from apps.users.models import UserSubscription
+            subscription = UserSubscription.objects.filter(
+                user=self.order.client,
+                status='ACTIVE'
+            ).select_related('plan').first()
+            
+            has_tracking = subscription and subscription.is_active and subscription.plan.delivery_tracking_available
+        except:
+            has_tracking = False
+        
+        return is_paid and has_tracking
+    
+    def save(self, *args, **kwargs):
+        # Автоматически вычисляем is_active при сохранении
+        self.is_active = self.calculate_is_active()
+        super().save(*args, **kwargs)
 
 
 
